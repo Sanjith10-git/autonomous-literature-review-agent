@@ -1,0 +1,9 @@
+streamlit
+reportlab
+langgraph
+langchain-ollama
+langchain-chroma
+langchain-community
+langchain-text-splitters
+pypdf
+duckduckgo-search
