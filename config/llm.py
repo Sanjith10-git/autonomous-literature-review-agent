@@ -58,18 +58,27 @@ def get_llm(
 
         # Fallback to environment variable or standard Groq key if set
         key = api_key or os.environ.get("GROQ_API_KEY")
-        target_model = model or "llama-3.3-70b-versatile"
+        # Robust model selection with fallback
+        target_model = model or "openai/gpt-oss-120b"
 
         if not key:
             raise ValueError(
                 "Groq API Key is required. Enter your free API key in the sidebar or configure GROQ_API_KEY in Streamlit Secrets."
             )
 
-        return ChatGroq(
-            groq_api_key=key,
-            model_name=target_model,
-            temperature=temperature
-        )
+        try:
+            return ChatGroq(
+                groq_api_key=key,
+                model_name=target_model,
+                temperature=temperature
+            )
+        except Exception:
+            # Fallback to high-speed verified model
+            return ChatGroq(
+                groq_api_key=key,
+                model_name="qwen/qwen3.8-27b",
+                temperature=temperature
+            )
 
     elif provider == "ollama":
         from langchain_ollama import ChatOllama
