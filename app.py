@@ -53,80 +53,105 @@ if "uploader_key" not in st.session_state:
 
 
 # --------------------------------------------------
-# BESPOKE EDITORIAL & ACADEMIC DESIGN SYSTEM
+# COHESIVE MODERN RESEARCH WORKSPACE CSS
 # --------------------------------------------------
 
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,600;6..72,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
     html, body, [class*="css"] {
-        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        color: #0F172A;
     }
 
     code, pre {
-        font-family: 'IBM Plex Mono', monospace !important;
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace !important;
     }
 
-    /* Main canvas proportions */
+    /* Transparent top bar so header never clips */
+    [data-testid="stHeader"] {
+        background: transparent !important;
+    }
+
+    /* Main canvas layout */
     .block-container {
-        padding-top: 2rem;
-        padding-bottom: 4.5rem;
-        max-width: 960px;
+        padding-top: 3.35rem !important;
+        padding-bottom: 4rem !important;
+        max-width: 880px !important;
     }
 
-    /* Hide anchor links next to headings */
+    /* Hide heading anchor icons */
     [data-testid="stHeaderActionElements"] {
         display: none !important;
     }
 
     /* Sidebar visual styling */
     [data-testid="stSidebar"] {
-        border-right: 1px solid rgba(148, 163, 184, 0.22);
+        background-color: #FFFFFF !important;
+        border-right: 1px solid #E2E8F0 !important;
     }
     .sidebar-brand {
         display: flex;
         align-items: center;
         gap: 0.7rem;
-        padding: 0.2rem 0 0.9rem 0;
-        margin-bottom: 0.9rem;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+        padding: 0.15rem 0 0.9rem 0;
+        margin-bottom: 0.95rem;
+        border-bottom: 1px solid #E2E8F0;
     }
     .sidebar-brand-icon {
         width: 34px;
         height: 34px;
         border-radius: 9px;
-        background: linear-gradient(180deg, #B91C1C 0%, #7F1D1D 100%);
+        background: linear-gradient(180deg, #0F766E 0%, #115E59 100%);
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        box-shadow: 0 2px 8px rgba(153, 27, 27, 0.28);
+        box-shadow: 0 2px 6px rgba(15, 118, 110, 0.25);
     }
     .sidebar-brand-title {
         font-size: 0.96rem;
         font-weight: 700;
         letter-spacing: -0.015em;
-        line-height: 1.2;
+        color: #0F172A;
     }
     .sidebar-section-label {
-        font-size: 0.71rem;
-        font-weight: 700;
-        letter-spacing: 0.08em;
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.07em;
         text-transform: uppercase;
         color: #64748B;
         margin: 0.45rem 0 0.35rem 0;
     }
+    .empty-history-box {
+        border: 1px dashed #CBD5E1;
+        border-radius: 9px;
+        padding: 0.9rem 0.75rem;
+        text-align: center;
+        color: #64748B;
+        font-size: 0.8rem;
+        background: #F8FAFC;
+        line-height: 1.45;
+    }
 
-    /* Left-aligned clean sidebar history buttons */
+    /* Sidebar buttons */
     [data-testid="stSidebar"] [data-testid="stButton"] button {
         justify-content: flex-start !important;
         text-align: left !important;
         border-radius: 8px !important;
         font-size: 0.84rem !important;
         font-weight: 500 !important;
-        padding: 0.48rem 0.7rem !important;
-        transition: all 0.16s ease !important;
+        padding: 0.5rem 0.75rem !important;
+        border: 1px solid #E2E8F0 !important;
+        background-color: #F8FAFC !important;
+        color: #0F172A !important;
+        transition: all 0.15s ease !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stButton"] button:hover {
+        border-color: #0F766E !important;
+        background-color: rgba(15, 118, 110, 0.05) !important;
+        color: #0F766E !important;
     }
     [data-testid="stSidebar"] [data-testid="stButton"] button p {
         white-space: nowrap !important;
@@ -135,152 +160,171 @@ st.markdown("""
         width: 100%;
     }
 
-    /* Subtle hover-revealed popover buttons */
-    [data-testid="stPopover"] > button {
-        border-radius: 8px !important;
-        font-size: 0.8rem !important;
-        font-weight: 500 !important;
-        border: 1px solid rgba(148, 163, 184, 0.3) !important;
-        opacity: 0.85;
-        transition: all 0.16s ease !important;
-    }
-    [data-testid="stPopover"] > button:hover {
-        opacity: 1;
-        border-color: #B91C1C !important;
-        color: #B91C1C !important;
-    }
-
-    /* Professional Editorial Header Card */
-    .hero-card {
+    /* Clean Unified Header */
+    .app-header {
         display: flex;
         align-items: center;
-        gap: 1.15rem;
-        padding: 1.35rem 1.7rem;
-        margin-bottom: 1.35rem;
-        border-radius: 14px;
-        background: linear-gradient(135deg, rgba(153, 27, 27, 0.08) 0%, rgba(185, 28, 28, 0.025) 55%, rgba(220, 38, 38, 0.05) 100%);
-        border: 1px solid rgba(153, 27, 27, 0.2);
-        border-left: 5px solid #991B1B;
-        box-shadow: 0 10px 28px -12px rgba(127, 29, 29, 0.18);
+        gap: 0.95rem;
+        padding-bottom: 1.1rem;
+        margin-bottom: 1.5rem;
+        border-bottom: 1px solid #E2E8F0;
     }
-    .hero-icon {
-        width: 46px;
-        height: 46px;
-        border-radius: 11px;
-        background: linear-gradient(180deg, #B91C1C 0%, #7F1D1D 100%);
+    .app-logo {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: linear-gradient(180deg, #0F766E 0%, #115E59 100%);
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        box-shadow: 0 4px 14px rgba(153, 27, 27, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+        box-shadow: 0 3px 10px rgba(15, 118, 110, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.2);
     }
-    .hero-title {
-        font-family: 'Newsreader', Georgia, serif;
-        font-size: 2.05rem;
+    .app-title {
+        font-size: clamp(1.35rem, 2.25vw, 1.72rem);
         font-weight: 700;
         letter-spacing: -0.025em;
-        line-height: 1.15;
+        line-height: 1.2;
+        color: #0F172A;
         margin: 0;
     }
 
-    /* Elevated paper-like containers */
+    /* Elevated Pure-White Workspace Cards */
     [data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #FFFFFF !important;
         border-radius: 14px !important;
-        border: 1px solid rgba(148, 163, 184, 0.25) !important;
-        box-shadow: 0 10px 28px -10px rgba(15, 23, 42, 0.08) !important;
-        padding: 0.5rem 0.35rem !important;
+        border: 1px solid #E2E8F0 !important;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 12px 30px -12px rgba(15, 23, 42, 0.08) !important;
+        padding: 1.25rem 1.45rem !important;
     }
 
-    /* Clean text input & dropzone */
+    /* Field Labels */
+    .field-label {
+        font-size: 0.86rem;
+        font-weight: 600;
+        color: #1E293B;
+        margin-bottom: 0.1rem;
+    }
+
+    /* Subtle Popover Trigger */
+    [data-testid="stPopover"] > button {
+        border-radius: 7px !important;
+        font-size: 0.78rem !important;
+        font-weight: 500 !important;
+        padding: 0.3rem 0.65rem !important;
+        border: 1px solid #E2E8F0 !important;
+        background-color: #F8FAFC !important;
+        color: #475569 !important;
+        transition: all 0.15s ease !important;
+    }
+    [data-testid="stPopover"] > button:hover {
+        border-color: #0F766E !important;
+        color: #0F766E !important;
+        background-color: #FFFFFF !important;
+    }
+
+    /* Inputs & File Uploader */
     [data-testid="stTextInput"] input {
         border-radius: 9px !important;
-        padding: 0.6rem 0.85rem !important;
-        font-size: 0.95rem !important;
+        border: 1px solid #CBD5E1 !important;
+        background-color: #F8FAFC !important;
+        color: #0F172A !important;
+        padding: 0.62rem 0.85rem !important;
+        font-size: 0.94rem !important;
+        transition: all 0.15s ease !important;
     }
     [data-testid="stTextInput"] input:focus {
-        border-color: #B91C1C !important;
-        box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.14) !important;
+        background-color: #FFFFFF !important;
+        border-color: #0F766E !important;
+        box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14) !important;
     }
     [data-testid="stFileUploaderDropzone"] {
         border-radius: 10px !important;
-        border: 1.5px dashed rgba(100, 116, 139, 0.38) !important;
-        transition: border-color 0.2s ease, background-color 0.2s ease;
+        border: 1.5px dashed #CBD5E1 !important;
+        background-color: #F8FAFC !important;
+        padding: 1rem !important;
+        transition: border-color 0.2s ease, background-color 0.2s ease !important;
     }
     [data-testid="stFileUploaderDropzone"]:hover {
-        border-color: #B91C1C !important;
-        background-color: rgba(185, 28, 28, 0.025) !important;
+        border-color: #0F766E !important;
+        background-color: rgba(15, 118, 110, 0.03) !important;
     }
 
-    /* Staged manuscript badges */
+    /* Staged manuscript chips */
     .staged-files {
         display: flex;
         flex-wrap: wrap;
         gap: 0.5rem;
-        margin: 0.4rem 0 0.9rem 0;
+        margin: 0.45rem 0 0.95rem 0;
     }
     .staged-chip {
         display: inline-flex;
         align-items: center;
-        gap: 0.5rem;
-        padding: 0.36rem 0.72rem;
+        gap: 0.45rem;
+        padding: 0.34rem 0.7rem;
         border-radius: 7px;
         font-size: 0.8rem;
         font-weight: 500;
-        background: rgba(148, 163, 184, 0.1);
-        border: 1px solid rgba(148, 163, 184, 0.26);
+        color: #0F172A;
+        background: #F1F5F9;
+        border: 1px solid #E2E8F0;
     }
     .staged-meta {
-        font-family: 'IBM Plex Mono', monospace;
+        font-family: 'JetBrains Mono', monospace;
         font-size: 0.73rem;
         color: #64748B;
     }
 
-    /* Primary & secondary buttons */
+    /* Primary & Secondary Action Buttons */
     button[kind="primary"] {
-        background: linear-gradient(180deg, #B91C1C 0%, #991B1B 100%) !important;
-        border-color: #7F1D1D !important;
+        background: linear-gradient(180deg, #0F766E 0%, #115E59 100%) !important;
+        border: 1px solid #0F766E !important;
         color: #FFFFFF !important;
         border-radius: 9px !important;
         font-weight: 600 !important;
-        font-size: 0.95rem !important;
+        font-size: 0.94rem !important;
         padding: 0.62rem 1.25rem !important;
-        box-shadow: 0 3px 10px rgba(153, 27, 27, 0.24) !important;
-        transition: all 0.18s ease !important;
+        box-shadow: 0 2px 8px rgba(15, 118, 110, 0.24) !important;
+        transition: all 0.16s ease !important;
     }
     button[kind="primary"]:hover {
-        background: linear-gradient(180deg, #DC2626 0%, #B91C1C 100%) !important;
-        border-color: #991B1B !important;
+        background: linear-gradient(180deg, #0D9488 0%, #0F766E 100%) !important;
+        border-color: #0D9488 !important;
         transform: translateY(-1px) !important;
-        box-shadow: 0 6px 16px rgba(185, 28, 28, 0.32) !important;
+        box-shadow: 0 5px 14px rgba(15, 118, 110, 0.3) !important;
     }
     button[kind="secondary"] {
         border-radius: 8px !important;
         font-weight: 500 !important;
-        border-color: rgba(148, 163, 184, 0.35) !important;
+        border: 1px solid #CBD5E1 !important;
+        background-color: #FFFFFF !important;
+        color: #0F172A !important;
     }
     button[kind="secondary"]:hover {
-        border-color: #B91C1C !important;
-        color: #B91C1C !important;
+        border-color: #0F766E !important;
+        color: #0F766E !important;
     }
 
-    /* Segmented Pill Tab Styling */
+    /* Segmented Pill Tab Bar */
     [data-baseweb="tab-list"] {
         gap: 0.35rem;
-        background: rgba(148, 163, 184, 0.1);
+        background: #F1F5F9;
         padding: 0.3rem;
         border-radius: 10px;
-        border: 1px solid rgba(148, 163, 184, 0.18);
+        border: 1px solid #E2E8F0;
     }
     button[data-baseweb="tab"] {
         border-radius: 7px !important;
         padding: 0.42rem 0.9rem !important;
-        font-size: 0.86rem !important;
+        font-size: 0.85rem !important;
         font-weight: 500 !important;
+        color: #475569 !important;
     }
     button[data-baseweb="tab"][aria-selected="true"] {
-        background: rgba(153, 27, 27, 0.12) !important;
-        color: #B91C1C !important;
+        background: #FFFFFF !important;
+        color: #0F766E !important;
         font-weight: 600 !important;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
     }
     [data-baseweb="tab-highlight"] {
         display: none !important;
@@ -296,11 +340,11 @@ st.markdown("""
     .metric-box {
         padding: 0.65rem 0.85rem;
         border-radius: 9px;
-        background: rgba(148, 163, 184, 0.07);
-        border: 1px solid rgba(148, 163, 184, 0.2);
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
     }
     .metric-label {
-        font-size: 0.7rem;
+        font-size: 0.69rem;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.06em;
@@ -308,29 +352,42 @@ st.markdown("""
         margin-bottom: 0.15rem;
     }
     .metric-value {
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 0.92rem;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.9rem;
         font-weight: 600;
+        color: #0F172A;
     }
 
-    /* Reading flow inside Report */
+    /* Report Reading Typography */
     .report-body {
         line-height: 1.75;
-        font-size: 0.96rem;
+        font-size: 0.95rem;
+        color: #1E293B;
         padding-top: 0.35rem;
     }
     .report-body blockquote {
-        border-left: 3px solid #B91C1C;
+        border-left: 3px solid #0F766E;
         padding-left: 1rem;
-        opacity: 0.88;
+        color: #475569;
     }
     .qa-answer {
         padding: 0.9rem 1.1rem;
         border-radius: 10px;
-        background: rgba(153, 27, 27, 0.05);
-        border: 1px solid rgba(153, 27, 27, 0.18);
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-left: 3px solid #0F766E;
         margin-top: 0.5rem;
         line-height: 1.65;
+        color: #0F172A;
+    }
+
+    /* Quiet workflow hint strip under idle form */
+    .subtle-footer {
+        text-align: center;
+        font-size: 0.78rem;
+        color: #64748B;
+        margin-top: 1.15rem;
+        letter-spacing: 0.01em;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -376,7 +433,7 @@ def create_pdf(report: str, topic: str) -> bytes:
         "ReportTitle",
         parent=styles["Title"],
         alignment=TA_CENTER,
-        textColor=colors.HexColor("#991B1B"),
+        textColor=colors.HexColor("#0F766E"),
         fontSize=18,
         leading=22,
         spaceAfter=10
@@ -454,9 +511,7 @@ with st.sidebar:
                 <path d="M8 11h8"/>
             </svg>
         </div>
-        <div>
-            <div class="sidebar-brand-title">Literature Agent</div>
-        </div>
+        <div class="sidebar-brand-title">Literature Agent</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -467,7 +522,7 @@ with st.sidebar:
     st.write("")
 
     # History section + hidden Manage popover
-    hist_hdr_col, hist_mgr_col = st.columns([1.8, 1])
+    hist_hdr_col, hist_mgr_col = st.columns([1.8, 1], vertical_alignment="center")
     with hist_hdr_col:
         st.markdown('<div class="sidebar-section-label">History</div>', unsafe_allow_html=True)
     with hist_mgr_col:
@@ -521,7 +576,10 @@ with st.sidebar:
         ).strip().lower()
 
     if not st.session_state["history"]:
-        st.caption("Completed literature reviews appear here.")
+        st.markdown(
+            '<div class="empty-history-box">Completed literature reviews will appear here for quick access.</div>',
+            unsafe_allow_html=True
+        )
     else:
         filtered_items = [
             item for item in st.session_state["history"]
@@ -543,13 +601,13 @@ with st.sidebar:
 
     st.divider()
 
-    # Hidden / collapsed Researcher Preferences (Zero API Key or Temperature clutter)
+    # Hidden / collapsed Researcher Preferences (concise labels to prevent sidebar clipping)
     with st.expander("Research Preferences", expanded=False):
         source_scope = st.radio(
             "Evidence Sources",
             ["Hybrid (PDFs + Web)", "Uploaded PDFs Only", "Web Discovery Only"],
             index=0,
-            help="Choose whether to combine uploaded manuscripts with live web literature or run a single source."
+            help="Combine uploaded manuscripts with live web literature or run a single source."
         )
         source_mode_key = (
             "hybrid" if "Hybrid" in source_scope
@@ -560,10 +618,10 @@ with st.sidebar:
         review_focus = st.selectbox(
             "Review Focus",
             [
-                "Comprehensive Literature Review",
-                "Comparative Methodology Analysis",
-                "Research Gaps & Open Problems",
-                "Executive Summary Brief"
+                "Comprehensive Review",
+                "Methodology Comparison",
+                "Research Gaps",
+                "Executive Brief"
             ],
             index=0
         )
@@ -572,7 +630,7 @@ with st.sidebar:
             "Writing Style",
             [
                 "Academic Prose",
-                "Structured Bullet Synthesis",
+                "Structured Synthesis",
                 "Critical Peer Review"
             ],
             index=0
@@ -586,7 +644,7 @@ with st.sidebar:
             help="Number of web literature results gathered per topic."
         )
 
-    # Collapsed Research Notes Scratchpad (linked to active review!)
+    # Collapsed Research Notes Scratchpad
     active_for_notes = get_active_review()
     with st.expander("Research Notes", expanded=False):
         if active_for_notes is not None:
@@ -609,41 +667,24 @@ with st.sidebar:
                     use_container_width=True
                 )
         else:
-            st.caption("Select or complete a review to keep linked research notes.")
+            st.caption("Complete or select a review to attach notes.")
 
 
 # --------------------------------------------------
-# TOP HEADER & HIDDEN SAMPLE TOPICS
+# UNIFIED PROFESSIONAL HEADER
 # --------------------------------------------------
 
-hdr_col, sample_col = st.columns([4.4, 1.15], vertical_alignment="center")
-
-with hdr_col:
-    st.markdown("""
-    <div class="hero-card">
-        <div class="hero-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-            </svg>
-        </div>
-        <h1 class="hero-title">Autonomous Literature Review Assistance Agent</h1>
+st.markdown("""
+<div class="app-header">
+    <div class="app-logo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+        </svg>
     </div>
-    """, unsafe_allow_html=True)
-
-with sample_col:
-    with st.popover("Sample Topics", use_container_width=True):
-        st.caption("Select a topic preset:")
-        samples = [
-            "Generative AI applications in clinical diagnostics",
-            "Retrieval-augmented generation for hallucination mitigation",
-            "Transformer attention mechanisms in long-context modeling",
-            "Autonomous multi-agent workflows in scientific discovery"
-        ]
-        for idx, sample in enumerate(samples):
-            if st.button(sample, key=f"sample_{idx}", use_container_width=True):
-                st.session_state["topic_input"] = sample
-                st.rerun()
+    <h1 class="app-title">Autonomous Literature Review Assistance Agent</h1>
+</div>
+""", unsafe_allow_html=True)
 
 
 # --------------------------------------------------
@@ -651,12 +692,31 @@ with sample_col:
 # --------------------------------------------------
 
 with st.container(border=True):
+    lbl_col, sample_col = st.columns([3.4, 1.15], vertical_alignment="center")
+    with lbl_col:
+        st.markdown('<div class="field-label">Research Topic</div>', unsafe_allow_html=True)
+    with sample_col:
+        with st.popover("Sample Topics", use_container_width=True):
+            st.caption("Load a topic preset:")
+            samples = [
+                "Generative AI applications in clinical diagnostics",
+                "Retrieval-augmented generation for hallucination mitigation",
+                "Transformer attention mechanisms in long-context modeling",
+                "Autonomous multi-agent workflows in scientific discovery"
+            ]
+            for idx, sample in enumerate(samples):
+                if st.button(sample, key=f"sample_{idx}", use_container_width=True):
+                    st.session_state["topic_input"] = sample
+                    st.rerun()
+
     topic = st.text_input(
         "Research Topic",
         key="topic_input",
-        placeholder="Example: Generative AI applications in clinical diagnostics"
+        placeholder="Example: Generative AI applications in clinical diagnostics",
+        label_visibility="collapsed"
     )
 
+    st.write("")
     uploaded_files = st.file_uploader(
         "Research Papers (PDF)",
         type=["pdf"],
@@ -678,6 +738,7 @@ with st.container(border=True):
         )
         st.markdown(f'<div class="staged-files">{chips_html}</div>', unsafe_allow_html=True)
 
+    st.write("")
     run_clicked = st.button(
         "Start Research",
         type="primary",
@@ -800,11 +861,11 @@ if active_review:
     st.write("")
     with st.container(border=True):
 
-        header_left, header_right = st.columns([2.2, 1.4])
+        header_left, header_right = st.columns([2.2, 1.4], vertical_alignment="center")
         with header_left:
             st.subheader(active_review["topic"])
             st.caption(
-                f"{active_review.get('focus', 'Literature Review')} • "
+                f"{active_review.get('focus', 'Comprehensive Review')} • "
                 f"{active_review.get('style', 'Academic Prose')} • "
                 f"{active_review['timestamp']}"
             )
@@ -949,3 +1010,8 @@ if active_review:
                     st.markdown(f"**Q: {html.escape(entry['q'])}**")
                     st.markdown(f'<div class="qa-answer">{entry["a"]}</div>', unsafe_allow_html=True)
                     st.write("")
+else:
+    st.markdown(
+        '<div class="subtle-footer">Document Indexing &nbsp;&middot;&nbsp; Live Web Discovery &nbsp;&middot;&nbsp; Claim Verification &nbsp;&middot;&nbsp; Markdown &amp; PDF Export</div>',
+        unsafe_allow_html=True
+    )
