@@ -1,51 +1,59 @@
-from langchain_ollama import OllamaLLM
+import os
+from typing import Optional, Dict, Any
 from tools.web_search import web_search
+from config.llm import get_llm
 
 
-llm = OllamaLLM(
-    model="llama3.2"
-)
-
-
-def web_agent(topic):
-
-    results = web_search(
-        topic,
-        max_results=5
-    )
+def web_agent(
+    topic: str,
+    llm: Optional[any] = None
+) -> Dict[str, Any]:
+    """
+    Performs web discovery and literature reconnaissance on the topic.
+    Returns a dictionary containing synthesized findings and structured sources.
+    """
+    search_query = f"{topic} research paper recent findings"
+    results = web_search(search_query, max_results=5)
 
     if not results:
-        return "No web search results found."
+        # Retry with broader query
+        results = web_search(topic, max_results=5)
+
+    if not results:
+        return {
+            "summary": "No real-time web search results could be retrieved for this query.",
+            "sources": []
+        }
 
     context = "\n\n".join(
-        f"Title: {result['title']}\n"
-        f"URL: {result['url']}\n"
-        f"Summary: {result['snippet']}"
-        for result in results
+        f"Source [{i}]: {r['title']}\nURL: {r['url']}\nExcerpt: {r['snippet']}"
+        for i, r in enumerate(results, start=1)
     )
 
-    prompt = f"""
-You are a web research agent.
+    prompt = f"""You are an elite Autonomous Web Research Agent specializing in academic discovery.
 
-Research topic:
+Research Topic:
 {topic}
 
-Web search results:
+Live Web Research Data:
 {context}
 
-Analyze the search results and provide:
-
-1. Important findings
-2. Key facts
-3. Relevant sources
-4. Information that should be verified
+Analyze these findings and deliver a structured synthesis containing:
+1. Current State of the Art & Breakthroughs
+2. Empirical Findings & Methodologies
+3. Prominent Research Groups or Real-World Implementations
+4. Critical Questions for Cross-Verification
 
 Rules:
-- Do not invent information.
-- Use only the provided search results.
-- Include relevant source URLs.
+- Be precise, technical, and objective.
+- Explicitly cite source numbers (e.g., [Source 1], [Source 2]) when referencing facts.
+- Do not invent claims or metrics not verified by the search context.
 """
+    model = llm if llm is not None else get_llm(provider="groq" if os.environ.get("GROQ_API_KEY") else "ollama")
+    response = model.invoke(prompt)
+    summary_text = response.content if hasattr(response, "content") else str(response)
 
-    answer = llm.invoke(prompt)
-
-    return answer
+    return {
+        "summary": summary_text,
+        "sources": results
+    }

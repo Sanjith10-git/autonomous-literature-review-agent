@@ -1,55 +1,63 @@
-from langchain_ollama import OllamaLLM, OllamaEmbeddings
+import os
+from typing import Optional
 from langchain_chroma import Chroma
+from config.llm import get_embeddings, get_llm
+
+DB_DIR = "rag/chroma_db"
 
 
-llm = OllamaLLM(
-    model="llama3.2"
-)
+def rag_agent(
+    question: str,
+    llm: Optional[any] = None,
+    embeddings_provider: str = "auto",
+    ollama_base_url: str = "http://localhost:11434"
+) -> str:
+    """
+    Retrieves evidence from ingested PDF research papers stored in ChromaDB.
+    """
+    if not os.path.exists(DB_DIR) or not os.listdir(DB_DIR):
+        return "No local research papers were uploaded or indexed for this analysis. Relying on live web literature."
 
-embeddings = OllamaEmbeddings(
-    model="nomic-embed-text"
-)
+    try:
+        embeddings = get_embeddings(provider=embeddings_provider, base_url=ollama_base_url)
+        vectorstore = Chroma(
+            collection_name="research_documents",
+            persist_directory=DB_DIR,
+            embedding_function=embeddings
+        )
 
-vectorstore = Chroma(
-    collection_name="research_documents",
-    persist_directory="rag/chroma_db",
-    embedding_function=embeddings
-)
+        documents = vectorstore.similarity_search(question, k=4)
+        if not documents:
+            return "No directly relevant passages found in the uploaded documents for this specific topic."
 
+        context_blocks = []
+        for i, doc in enumerate(documents, start=1):
+            source = os.path.basename(doc.metadata.get("source", "Uploaded Paper"))
+            page = doc.metadata.get("page", 0) + 1
+            context_blocks.append(f"[Source {i}: {source} (Page {page})]\n{doc.page_content.strip()}")
 
-def rag_agent(question):
+        context = "\n\n".join(context_blocks)
 
-    documents = vectorstore.similarity_search(
-        question,
-        k=4
-    )
+        prompt = f"""You are an expert Document Analysis and RAG Agent.
 
-    if not documents:
-        return "No relevant information found in the uploaded documents."
+Your goal is to extract evidence-backed insights from the provided academic paper excerpts.
 
-    context = "\n\n".join(
-        document.page_content
-        for document in documents
-    )
-
-    prompt = f"""
-You are a research assistant.
-
-Answer the question using the research information below.
-
-Research information:
-{context}
-
-Question:
+Research Topic / Query:
 {question}
 
-Instructions:
-- Give a clear answer.
-- Use the provided research information.
-- Do not invent facts.
-- If the information is unavailable, say so.
+Extracted Academic Evidence:
+{context}
+
+Guidelines:
+- Provide clear, evidence-based synthesis.
+- Cite specific document passages or source numbers where possible.
+- Do not fabricate claims or statistics not present in the excerpts.
+- If certain aspects of the question are unaddressed in the text, state that explicitly.
 """
+        model = llm if llm is not None else get_llm(provider="groq" if os.environ.get("GROQ_API_KEY") else "ollama")
+        response = model.invoke(prompt)
 
-    answer = llm.invoke(prompt)
+        return response.content if hasattr(response, "content") else str(response)
 
-    return answer
+    except Exception as e:
+        return f"Document retrieval notice: {str(e)}"

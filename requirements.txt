@@ -8,3 +8,5 @@ langchain-text-splitters
 pypdf
 duckduckgo-search
 ddgs
+langchain-groq
+groq
