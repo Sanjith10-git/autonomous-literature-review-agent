@@ -104,14 +104,10 @@ st.markdown("""
         box-shadow: 0 2px 8px rgba(30, 58, 138, 0.24);
     }
     .sidebar-brand-title {
-        font-size: 0.95rem;
+        font-size: 0.96rem;
         font-weight: 700;
         letter-spacing: -0.015em;
         line-height: 1.2;
-    }
-    .sidebar-brand-sub {
-        font-size: 0.72rem;
-        color: #64748B;
     }
     .sidebar-section-label {
         font-size: 0.71rem;
@@ -154,39 +150,37 @@ st.markdown("""
         color: #1D4ED8 !important;
     }
 
-    /* Atmospheric Editorial Header Card */
+    /* Refined Editorial Header Card */
     .hero-card {
-        position: relative;
-        padding: 1.55rem 1.8rem;
-        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1.05rem;
+        padding: 1.25rem 1.55rem;
+        margin-bottom: 1.35rem;
         border-radius: 14px;
-        background: linear-gradient(135deg, rgba(30, 58, 138, 0.065) 0%, rgba(14, 165, 233, 0.04) 100%);
-        border: 1px solid rgba(30, 58, 138, 0.16);
+        background: linear-gradient(125deg, rgba(30, 58, 138, 0.085) 0%, rgba(30, 58, 138, 0.025) 60%, rgba(14, 165, 233, 0.06) 100%);
+        border: 1px solid rgba(30, 58, 138, 0.18);
         border-left: 4px solid #1E3A8A;
+        box-shadow: 0 8px 24px -10px rgba(30, 58, 138, 0.14);
     }
-    .hero-kicker {
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 0.72rem;
-        font-weight: 500;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: #1D4ED8;
-        margin-bottom: 0.4rem;
+    .hero-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 11px;
+        background: linear-gradient(180deg, #1E40AF 0%, #1E3A8A 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.28);
     }
     .hero-title {
         font-family: 'Newsreader', Georgia, serif;
-        font-size: 2.15rem;
+        font-size: 1.95rem;
         font-weight: 700;
         letter-spacing: -0.02em;
-        line-height: 1.15;
-        margin: 0 0 0.45rem 0;
-    }
-    .hero-subtitle {
-        font-size: 0.95rem;
-        opacity: 0.8;
-        line-height: 1.55;
+        line-height: 1.18;
         margin: 0;
-        max-width: 680px;
     }
 
     /* Elevated paper-like containers */
@@ -462,7 +456,6 @@ with st.sidebar:
         </div>
         <div>
             <div class="sidebar-brand-title">Literature Agent</div>
-            <div class="sidebar-brand-sub">Research Workspace</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -623,22 +616,22 @@ with st.sidebar:
 # TOP HEADER & HIDDEN SAMPLE TOPICS
 # --------------------------------------------------
 
-hdr_col, sample_col = st.columns([4.4, 1.15])
+hdr_col, sample_col = st.columns([4.4, 1.15], vertical_alignment="center")
 
 with hdr_col:
     st.markdown("""
     <div class="hero-card">
-        <div class="hero-kicker">Academic Literature Synthesis</div>
+        <div class="hero-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+            </svg>
+        </div>
         <h1 class="hero-title">Autonomous Literature Review Assistance Agent</h1>
-        <p class="hero-subtitle">
-            Synthesize peer-reviewed PDFs with live web discovery, automated claim verification, and structured academic reporting.
-        </p>
     </div>
     """, unsafe_allow_html=True)
 
 with sample_col:
-    st.write("")
-    st.write("")
     with st.popover("Sample Topics", use_container_width=True):
         st.caption("Select a topic preset:")
         samples = [
