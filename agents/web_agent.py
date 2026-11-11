@@ -1,14 +1,10 @@
-from langchain_ollama import OllamaLLM
+from typing import Optional
+from config.llm import invoke_llm
 from tools.web_search import web_search
 
 
-llm = OllamaLLM(
-    model="llama3.2"
-)
-
-
-def web_agent(topic):
-
+def web_agent(topic: str, api_key: Optional[str] = None) -> str:
+    """Searches the web for the research topic and summarizes key sourced findings."""
     results = web_search(
         topic,
         max_results=5
@@ -45,7 +41,4 @@ Rules:
 - Use only the provided search results.
 - Include relevant source URLs.
 """
-
-    answer = llm.invoke(prompt)
-
-    return answer
+    return invoke_llm(prompt, api_key=api_key)

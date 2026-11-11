@@ -1,29 +1,15 @@
-from langchain_ollama import OllamaLLM, OllamaEmbeddings
-from langchain_chroma import Chroma
+from typing import Optional
+from config.llm import invoke_llm
+from rag.ingest import get_vectorstore
 
 
-llm = OllamaLLM(
-    model="llama3.2"
-)
+def rag_agent(question: str, api_key: Optional[str] = None) -> str:
+    """Retrieves relevant chunks from ingested PDFs and answers using the active LLM."""
+    vectorstore = get_vectorstore()
+    if vectorstore is None:
+        return "No relevant information found in the uploaded documents."
 
-embeddings = OllamaEmbeddings(
-    model="nomic-embed-text"
-)
-
-vectorstore = Chroma(
-    collection_name="research_documents",
-    persist_directory="rag/chroma_db",
-    embedding_function=embeddings
-)
-
-
-def rag_agent(question):
-
-    documents = vectorstore.similarity_search(
-        question,
-        k=4
-    )
-
+    documents = vectorstore.similarity_search(question, k=4)
     if not documents:
         return "No relevant information found in the uploaded documents."
 
@@ -49,7 +35,4 @@ Instructions:
 - Do not invent facts.
 - If the information is unavailable, say so.
 """
-
-    answer = llm.invoke(prompt)
-
-    return answer
+    return invoke_llm(prompt, api_key=api_key)

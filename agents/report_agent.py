@@ -1,18 +1,15 @@
-from langchain_ollama import OllamaLLM
-
-
-llm = OllamaLLM(
-    model="llama3.2"
-)
+from typing import Optional
+from config.llm import invoke_llm
 
 
 def report_agent(
-    topic,
-    rag_information,
-    web_information,
-    verification
-):
-
+    topic: str,
+    rag_information: str,
+    web_information: str,
+    verification: str,
+    api_key: Optional[str] = None
+) -> str:
+    """Compiles a structured academic literature review report from all agent outputs."""
     prompt = f"""
 You are a professional research report writer.
 
@@ -59,7 +56,4 @@ Rules:
 - Include relevant source URLs from the web research.
 - Write in a professional academic style.
 """
-
-    answer = llm.invoke(prompt)
-
-    return answer
+    return invoke_llm(prompt, api_key=api_key)

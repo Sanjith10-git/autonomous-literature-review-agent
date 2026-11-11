@@ -1,17 +1,14 @@
-from langchain_ollama import OllamaLLM
-
-
-llm = OllamaLLM(
-    model="llama3.2"
-)
+from typing import Optional
+from config.llm import invoke_llm
 
 
 def verification_agent(
-    topic,
-    rag_information,
-    web_information
-):
-
+    topic: str,
+    rag_information: str,
+    web_information: str,
+    api_key: Optional[str] = None
+) -> str:
+    """Cross-checks uploaded document insights against web findings."""
     prompt = f"""
 You are a research verification agent.
 
@@ -40,7 +37,4 @@ Rules:
 - Do not invent statistics.
 - Clearly identify uncertainty.
 """
-
-    answer = llm.invoke(prompt)
-
-    return answer
+    return invoke_llm(prompt, api_key=api_key)

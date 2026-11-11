@@ -1,6 +1,7 @@
 import os
 import io
 import html
+import tempfile
 import streamlit as st
 
 from reportlab.lib import colors
@@ -14,6 +15,7 @@ from reportlab.platypus import (
     HRFlowable
 )
 
+from config.llm import get_groq_api_key, is_ollama_running
 from rag.ingest import ingest_pdfs
 from workflow import research_workflow
 
@@ -340,6 +342,10 @@ st.markdown("""
 # RESEARCH INPUT CARD
 # --------------------------------------------------
 
+configured_groq_key = get_groq_api_key()
+local_ollama_up = is_ollama_running()
+groq_key_input = configured_groq_key
+
 with st.container(border=True):
     topic = st.text_input(
         "Research Topic",
@@ -359,6 +365,14 @@ with st.container(border=True):
             for f in uploaded_files
         )
         st.markdown(f'<div class="staged-files">{chips_html}</div>', unsafe_allow_html=True)
+
+    if not local_ollama_up and not configured_groq_key:
+        groq_key_input = st.text_input(
+            "Groq API Key",
+            type="password",
+            placeholder="gsk_...",
+            help="Required on Streamlit Cloud when GROQ_API_KEY is not saved in App Secrets."
+        )
 
     run_clicked = st.button(
         "Start Research",
@@ -381,6 +395,12 @@ if run_clicked:
 
         st.error("Please upload at least one PDF research paper.")
 
+    elif not local_ollama_up and not groq_key_input.strip():
+
+        st.error(
+            "Please enter a Groq API Key above (or add `GROQ_API_KEY` in Streamlit Cloud App Settings -> Secrets)."
+        )
+
     else:
 
         try:
@@ -388,16 +408,19 @@ if run_clicked:
             with st.status("Running literature review...", expanded=True) as status:
 
                 st.write("Saving uploaded PDF files...")
+                temp_dir = tempfile.mkdtemp()
+                uploaded_paths = []
                 for uploaded_file in uploaded_files:
                     file_path = os.path.join(
-                        DATA_DIR,
+                        temp_dir,
                         os.path.basename(uploaded_file.name)
                     )
                     with open(file_path, "wb") as file:
                         file.write(uploaded_file.getbuffer())
+                    uploaded_paths.append(file_path)
 
                 st.write("Indexing manuscripts into vector store...")
-                ingest_pdfs()
+                ingest_pdfs(pdf_paths=uploaded_paths)
 
                 st.write("Retrieving document evidence, searching web literature, and verifying claims...")
                 result = research_workflow.invoke({
@@ -405,7 +428,8 @@ if run_clicked:
                     "rag_result": "",
                     "web_result": "",
                     "verification": "",
-                    "report": ""
+                    "report": "",
+                    "api_key": groq_key_input.strip() or None
                 })
 
                 report = result["report"]
@@ -443,10 +467,10 @@ if run_clicked:
         except Exception as error:
 
             err_msg = str(error)
-            if "ollama" in err_msg.lower() or "connection" in err_msg.lower():
+            if "no active llm backend" in err_msg.lower() or "ollama" in err_msg.lower() or "connection" in err_msg.lower():
                 st.error(
-                    "Could not connect to the local Ollama service. "
-                    "Start Ollama locally (`ollama serve`) with `llama3.2` and `nomic-embed-text` available."
+                    "Unable to reach an active LLM backend. On Streamlit Cloud, add `GROQ_API_KEY` in App Settings -> Secrets "
+                    "(or enter your key above). Locally, start Ollama (`ollama serve`)."
                 )
             else:
                 st.error("The research workflow failed during execution.")
