@@ -172,32 +172,16 @@ code, pre { font-family: 'JetBrains Mono', monospace !important; }
     width: 180px; height: 180px; border-radius: 50%;
     background: radial-gradient(circle, rgba(13,148,136,0.14) 0%, transparent 70%);
 }
-.hero-eyebrow {
-    display: inline-flex; align-items: center; gap: 0.5rem;
-    background: rgba(15,118,110,0.2);
-    border: 1px solid rgba(15,118,110,0.4);
-    border-radius: 20px; padding: 0.22rem 0.95rem;
-    font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em;
-    text-transform: uppercase; color: #5EEAD4;
-    margin-bottom: 1.1rem;
-}
 .hero-title {
-    font-size: 2.05rem; font-weight: 800;
+    font-size: 2.2rem; font-weight: 800;
     color: #FFFFFF; letter-spacing: -0.03em;
-    line-height: 1.2; margin: 0 0 0.8rem 0;
+    line-height: 1.18; margin: 0 0 0.85rem 0;
+    text-shadow: 0 2px 20px rgba(0,0,0,0.4);
 }
 .hero-subtitle {
-    font-size: 0.95rem; color: rgba(255,255,255,0.6);
+    font-size: 0.97rem; color: rgba(255,255,255,0.78);
     line-height: 1.65; margin: 0; max-width: 520px;
 }
-.hero-badges { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 1.5rem; }
-.hero-badge {
-    background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 6px; padding: 0.2rem 0.65rem;
-    font-size: 0.71rem; font-weight: 500; color: #A7F3D0;
-}
-
 /* ── White content cards ── */
 [data-testid="stVerticalBlockBorderWrapper"] {
     border-radius: 12px !important;
@@ -526,19 +510,11 @@ with st.sidebar:
 # ── Hero header ───────────────────────────────────────────────────────────────
 st.markdown("""
 <div class="hero-wrap">
-    <div class="hero-eyebrow">🔬 AI Research Platform</div>
     <h1 class="hero-title">Autonomous Literature Review<br>Assistance Agent</h1>
     <p class="hero-subtitle">
         Upload peer-reviewed manuscripts and define a research topic to generate a
         verified, citation-backed synthesis report — powered by multi-agent AI.
     </p>
-    <div class="hero-badges">
-        <span class="hero-badge">📄 Document Indexing</span>
-        <span class="hero-badge">🌐 Live Web Discovery</span>
-        <span class="hero-badge">✅ Claim Verification</span>
-        <span class="hero-badge">📊 Synthesis Report</span>
-        <span class="hero-badge">📥 PDF Export</span>
-    </div>
 </div>
 """, unsafe_allow_html=True)
 
