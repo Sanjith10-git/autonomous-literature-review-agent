@@ -1,6 +1,7 @@
 import os
-import shutil
-from typing import Dict, Any
+import uuid
+import chromadb
+from typing import Dict, Any, Optional, List
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -9,39 +10,61 @@ from langchain_chroma import Chroma
 from config.llm import get_embeddings
 
 DATA_DIR = "data"
-DB_DIR = "rag/chroma_db"
+
+# Pure In-Memory Chroma Client (Immune to SQLite disk locks & cloud filesystem error code 14)
+_CHROMA_CLIENT = chromadb.EphemeralClient()
+_GLOBAL_VECTORSTORE: Optional[Chroma] = None
+
+
+def get_vectorstore(
+    embeddings_provider: str = "auto",
+    ollama_base_url: str = "http://localhost:11434"
+) -> Optional[Chroma]:
+    """
+    Returns the active in-memory vectorstore or None if uninitialized.
+    """
+    global _GLOBAL_VECTORSTORE
+    return _GLOBAL_VECTORSTORE
 
 
 def ingest_pdfs(
     data_dir: str = DATA_DIR,
-    db_dir: str = DB_DIR,
+    pdf_paths: Optional[List[str]] = None,
     embeddings_provider: str = "auto",
     ollama_base_url: str = "http://localhost:11434"
 ) -> Dict[str, Any]:
     """
-    Ingests and embeds all PDF research papers found in data_dir into ChromaDB.
+    Ingests and embeds PDF research papers into an isolated in-memory ChromaDB collection.
     Returns metadata summary dictionary for UI display.
     """
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir, exist_ok=True)
+    global _CHROMA_CLIENT, _GLOBAL_VECTORSTORE
+
+    target_paths = []
+    if pdf_paths:
+        target_paths = [p for p in pdf_paths if os.path.exists(p) and p.lower().endswith(".pdf")]
+    else:
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir, exist_ok=True)
+        for filename in sorted(os.listdir(data_dir)):
+            if filename.lower().endswith(".pdf"):
+                target_paths.append(os.path.join(data_dir, filename))
 
     documents = []
     processed_files = []
 
-    for filename in sorted(os.listdir(data_dir)):
-        if filename.lower().endswith(".pdf"):
-            path = os.path.join(data_dir, filename)
-            try:
-                loader = PyPDFLoader(path)
-                docs = loader.load()
-                documents.extend(docs)
-                processed_files.append({
-                    "name": filename,
-                    "pages": len(docs),
-                    "size_kb": round(os.path.getsize(path) / 1024, 1)
-                })
-            except Exception as e:
-                print(f"Error loading {filename}: {e}")
+    for path in target_paths:
+        filename = os.path.basename(path)
+        try:
+            loader = PyPDFLoader(path)
+            docs = loader.load()
+            documents.extend(docs)
+            processed_files.append({
+                "name": filename,
+                "pages": len(docs),
+                "size_kb": round(os.path.getsize(path) / 1024, 1)
+            })
+        except Exception as e:
+            print(f"Error loading {filename}: {e}")
 
     if not documents:
         return {
@@ -59,26 +82,21 @@ def ingest_pdfs(
     )
     chunks = splitter.split_documents(documents)
 
-    # Initialize embeddings (auto chooses Ollama or built-in CPU ONNX for zero cloud crashes)
+    # Initialize embeddings (ONNX all-MiniLM-L6-v2 or Ollama)
     embeddings = get_embeddings(
         provider=embeddings_provider,
         base_url=ollama_base_url
     )
 
-    # Reset existing collection cleanly if re-indexing
-    if os.path.exists(db_dir):
-        try:
-            shutil.rmtree(db_dir)
-        except Exception:
-            pass
-
-    vectorstore = Chroma(
-        collection_name="research_documents",
-        embedding_function=embeddings,
-        persist_directory=db_dir
+    # Create a fresh isolated collection in memory
+    unique_col = f"research_{uuid.uuid4().hex[:8]}"
+    _GLOBAL_VECTORSTORE = Chroma(
+        client=_CHROMA_CLIENT,
+        collection_name=unique_col,
+        embedding_function=embeddings
     )
 
-    vectorstore.add_documents(chunks)
+    _GLOBAL_VECTORSTORE.add_documents(chunks)
 
     return {
         "status": "success",

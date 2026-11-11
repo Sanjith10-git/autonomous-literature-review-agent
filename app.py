@@ -3,6 +3,7 @@ import io
 import html
 import time
 import json
+import tempfile
 import streamlit as st
 
 from reportlab.lib import colors
@@ -50,11 +51,11 @@ st.markdown("""
     /* Executive Hero Header */
     .hero-container {
         padding: 1.5rem 2rem;
-        background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+        border: 1px solid rgba(148, 163, 184, 0.2);
         border-radius: 16px;
         margin-bottom: 1.75rem;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
     }
     .hero-title {
         font-size: 2.2rem;
@@ -66,7 +67,7 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
     }
     .hero-subtitle {
-        color: #94A3B8;
+        color: #CBD5E1;
         font-size: 1.05rem;
         margin-bottom: 0.75rem;
     }
@@ -137,21 +138,21 @@ st.markdown("""
     .source-card {
         padding: 1rem 1.25rem;
         border-radius: 10px;
-        background: rgba(255, 255, 255, 0.02);
-        border: 1px solid rgba(255, 255, 255, 0.07);
+        background: rgba(148, 163, 184, 0.08);
+        border: 1px solid rgba(148, 163, 184, 0.25);
         margin-bottom: 0.75rem;
     }
     .source-title {
         font-weight: 600;
-        color: #60A5FA;
+        color: #3B82F6;
         text-decoration: none;
     }
     .source-title:hover {
         text-decoration: underline;
     }
     .source-snippet {
-        font-size: 0.88rem;
-        color: #94A3B8;
+        font-size: 0.9rem;
+        opacity: 0.85;
         margin-top: 0.35rem;
     }
 
@@ -450,12 +451,16 @@ if launch_clicked:
             # Step 1: Ingest PDFs if provided
             if uploaded_pdfs and mode_key != "web_only":
                 status_rag.warning("📑 **RAG Agent**\nIndexing papers...")
+                temp_dir = tempfile.mkdtemp()
+                uploaded_paths = []
                 for f in uploaded_pdfs:
-                    dest = os.path.join(DATA_DIR, os.path.basename(f.name))
+                    dest = os.path.join(temp_dir, os.path.basename(f.name))
                     with open(dest, "wb") as out:
                         out.write(f.getbuffer())
+                    uploaded_paths.append(dest)
 
                 ingest_res = ingest_pdfs(
+                    pdf_paths=uploaded_paths,
                     embeddings_provider="ollama" if active_provider == "ollama" else "chroma_default",
                     ollama_base_url=ollama_url_input
                 )

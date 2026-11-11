@@ -1,9 +1,7 @@
 import os
 from typing import Optional
-from langchain_chroma import Chroma
-from config.llm import get_embeddings, get_llm
-
-DB_DIR = "rag/chroma_db"
+from config.llm import get_llm
+from rag.ingest import get_vectorstore
 
 
 def rag_agent(
@@ -13,19 +11,17 @@ def rag_agent(
     ollama_base_url: str = "http://localhost:11434"
 ) -> str:
     """
-    Retrieves evidence from ingested PDF research papers stored in ChromaDB.
+    Retrieves evidence from ingested PDF research papers stored in the active in-memory ChromaDB vectorstore.
     """
-    if not os.path.exists(DB_DIR) or not os.listdir(DB_DIR):
+    vectorstore = get_vectorstore(
+        embeddings_provider=embeddings_provider,
+        ollama_base_url=ollama_base_url
+    )
+
+    if vectorstore is None:
         return "No local research papers were uploaded or indexed for this analysis. Relying on live web literature."
 
     try:
-        embeddings = get_embeddings(provider=embeddings_provider, base_url=ollama_base_url)
-        vectorstore = Chroma(
-            collection_name="research_documents",
-            persist_directory=DB_DIR,
-            embedding_function=embeddings
-        )
-
         documents = vectorstore.similarity_search(question, k=4)
         if not documents:
             return "No directly relevant passages found in the uploaded documents for this specific topic."
