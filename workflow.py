@@ -1,4 +1,4 @@
-from typing import TypedDict, Optional
+from typing import TypedDict, Optional, Any
 from typing_extensions import NotRequired
 from langgraph.graph import StateGraph, START, END
 
@@ -20,22 +20,30 @@ class ResearchState(TypedDict):
     temperature: NotRequired[float]
     max_results: NotRequired[int]
     include_web: NotRequired[bool]
+    source_mode: NotRequired[str]
+    review_focus: NotRequired[str]
+    writing_style: NotRequired[str]
+    vectorstore: NotRequired[Optional[Any]]
 
 
 def run_rag(state: ResearchState):
+    if state.get("source_mode") == "web_only":
+        return {"rag_result": "Document retrieval skipped (Web Discovery Only mode selected)."}
+
     result = rag_agent(
         state["topic"],
         api_key=state.get("api_key"),
         model=state.get("model"),
         provider=state.get("provider", "auto"),
-        temperature=state.get("temperature", 0.0)
+        temperature=state.get("temperature", 0.0),
+        vectorstore=state.get("vectorstore")
     )
     return {"rag_result": result}
 
 
 def run_web(state: ResearchState):
-    if not state.get("include_web", True):
-        return {"web_result": "Web search skipped per configuration."}
+    if state.get("source_mode") == "docs_only" or not state.get("include_web", True):
+        return {"web_result": "Web search skipped (Uploaded Manuscripts Only mode selected)."}
 
     result = web_agent(
         state["topic"],
@@ -70,7 +78,9 @@ def run_report(state: ResearchState):
         api_key=state.get("api_key"),
         model=state.get("model"),
         provider=state.get("provider", "auto"),
-        temperature=state.get("temperature", 0.0)
+        temperature=state.get("temperature", 0.0),
+        review_focus=state.get("review_focus", "Comprehensive Literature Review"),
+        writing_style=state.get("writing_style", "Academic Prose")
     )
     return {"report": result}
 

@@ -21,8 +21,8 @@ def get_vectorstore() -> Optional[Chroma]:
     return _VECTORSTORE
 
 
-def ingest_pdfs(pdf_paths: Optional[List[str]] = None, provider: str = "auto"):
-    """Ingests PDFs into an isolated in-memory Chroma collection."""
+def ingest_pdfs(pdf_paths: Optional[List[str]] = None, provider: str = "auto") -> Optional[Chroma]:
+    """Ingests PDFs into an isolated in-memory Chroma collection and returns the vectorstore."""
     global _VECTORSTORE
 
     target_paths = []
@@ -42,7 +42,7 @@ def ingest_pdfs(pdf_paths: Optional[List[str]] = None, provider: str = "auto"):
 
     if not documents:
         print("No PDF files found.")
-        return
+        return None
 
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
@@ -64,6 +64,7 @@ def ingest_pdfs(pdf_paths: Optional[List[str]] = None, provider: str = "auto"):
     _VECTORSTORE.add_documents(chunks)
 
     print("Documents successfully stored in Chroma.")
+    return _VECTORSTORE
 
 
 if __name__ == "__main__":

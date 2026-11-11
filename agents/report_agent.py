@@ -10,14 +10,22 @@ def report_agent(
     api_key: Optional[str] = None,
     model: Optional[str] = None,
     provider: str = "auto",
-    temperature: float = 0
+    temperature: float = 0,
+    review_focus: str = "Comprehensive Literature Review",
+    writing_style: str = "Academic Prose"
 ) -> str:
-    """Compiles a structured academic literature review report from all agent outputs."""
+    """Compiles a structured academic literature review report tailored to the researcher's focus and style."""
     prompt = f"""
-You are a professional research report writer.
+You are a professional academic research report writer.
 
 Research topic:
 {topic}
+
+Requested Review Focus:
+{review_focus}
+
+Requested Writing Style:
+{writing_style}
 
 Information from uploaded documents:
 {rag_information}
@@ -28,7 +36,7 @@ Web research:
 Verification:
 {verification}
 
-Create a detailed research report.
+Create a detailed research report aligned with the requested review focus and writing style.
 
 Use this structure:
 
@@ -57,7 +65,7 @@ Rules:
 - Do not invent statistics.
 - Clearly distinguish verified and uncertain information.
 - Include relevant source URLs from the web research.
-- Write in a professional academic style.
+- Tailor depth and formatting to '{review_focus}' using '{writing_style}'.
 """
     return invoke_llm(
         prompt,
