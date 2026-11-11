@@ -1,78 +1,65 @@
-import os
-from typing import Optional, List, Dict
-from config.llm import get_llm
+from langchain_ollama import OllamaLLM
+
+
+llm = OllamaLLM(
+    model="llama3.2"
+)
 
 
 def report_agent(
-    topic: str,
-    rag_information: str,
-    web_information: str,
-    verification: str,
-    sources: Optional[List[Dict[str, str]]] = None,
-    llm: Optional[any] = None
-) -> str:
-    """
-    Synthesizes an executive-level, publication-quality academic research report.
-    """
-    sources_text = ""
-    if sources:
-        sources_text = "\n".join(
-            f"- **[{s.get('title', 'Source')}]({s.get('url', '#')})**: {s.get('snippet', '')[:160]}..."
-            for s in sources if s.get("url")
-        )
+    topic,
+    rag_information,
+    web_information,
+    verification
+):
 
-    prompt = f"""You are an elite Academic Research Director and Scientific Report Writer.
+    prompt = f"""
+You are a professional research report writer.
 
-Synthesize all findings into a comprehensive, highly rigorous Literature Review & State-of-the-Art Report.
+Research topic:
+{topic}
 
-Topic: {topic}
+Information from uploaded documents:
+{rag_information}
 
----
-INPUT EVIDENCE STREAM:
-- Internal Document Findings:
-{rag_information[:2500]}
+Web research:
+{web_information}
 
-- External Web Discovery:
-{web_information[:2500]}
+Verification:
+{verification}
 
-- Cross-Verification & Fact-Checking:
-{verification[:2500]}
+Create a detailed research report.
 
-- Verified External References:
-{sources_text}
+Use this structure:
 
----
-Report Formatting Structure:
+# Research Report
 
-# Comprehensive Literature Review: {topic}
+## 1. Introduction
 
-## 1. Executive Summary & Abstract
-(Concise synthesis of core findings, relevance, and current landscape)
+## 2. Background
 
-## 2. Background & Theoretical Foundations
-(Contextual definition of core principles, underlying algorithms, or historical trajectory)
+## 3. Key Findings
 
-## 3. State-of-the-Art Analysis & Methodologies
-(Breakdown of prevailing architectures, experimental setups, and empirical evidence)
+## 4. Evidence from Uploaded Documents
 
-## 4. Cross-Source Evidence Synthesis & Fact Verification
-(Critical evaluation of verified claims vs. emerging uncorroborated theories)
+## 5. Web Research Findings
 
-## 5. Limitations, Open Challenges & Failure Modes
-(Technical bottlenecks, data constraints, or scalability challenges)
+## 6. Verification
 
-## 6. Strategic Conclusions & Future Research Directions
-(Forward-looking implications and high-impact research opportunities)
+## 7. Challenges and Limitations
 
-## 7. Bibliography & Verified Citations
-(List relevant citations with Markdown links where available)
+## 8. Conclusion
 
-Authoring Guidelines:
-- Adopt a formal, academic tone suitable for peer review.
-- Do not repeat placeholders. Write substantive, technical paragraphs.
-- Highlight concrete takeaways rather than generic generalizations.
+## 9. Sources
+
+Rules:
+- Do not invent information.
+- Do not invent statistics.
+- Clearly distinguish verified and uncertain information.
+- Include relevant source URLs from the web research.
+- Write in a professional academic style.
 """
-    model = llm if llm is not None else get_llm(provider="groq" if os.environ.get("GROQ_API_KEY") else "ollama")
-    response = model.invoke(prompt)
 
-    return response.content if hasattr(response, "content") else str(response)
+    answer = llm.invoke(prompt)
+
+    return answer

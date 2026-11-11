@@ -1,56 +1,46 @@
-import os
-from typing import Optional
-from config.llm import get_llm
+from langchain_ollama import OllamaLLM
+
+
+llm = OllamaLLM(
+    model="llama3.2"
+)
 
 
 def verification_agent(
-    topic: str,
-    rag_information: str,
-    web_information: str,
-    llm: Optional[any] = None
-) -> str:
-    """
-    Acts as an automated academic reviewer.
-    Cross-verifies claims between local document evidence and external web data.
-    """
-    prompt = f"""You are a Senior Academic Peer Reviewer and Verification Agent.
+    topic,
+    rag_information,
+    web_information
+):
 
-Your objective is to rigorously cross-verify claims between internal research papers and external web findings to detect consensus, identify contradictions, and eliminate hallucinations.
+    prompt = f"""
+You are a research verification agent.
 
-Research Topic:
+Research topic:
 {topic}
 
----
-INTERNAL DOCUMENT EVIDENCE (PDF Papers):
+Information from uploaded documents:
 {rag_information}
 
----
-EXTERNAL WEB DISCOVERY (Recent Web Sources):
+Information from web research:
 {web_information}
 
----
-Execute a structured cross-source comparative analysis:
+Compare the two sources.
 
-### 1. Corroborated Findings (High Confidence)
-- Detail facts, methodologies, or findings affirmed by BOTH sources.
+Provide:
 
-### 2. Discrepancies & Divergent Claims
-- Identify any conflicting metrics, conflicting timelines, or conflicting interpretations between documents and the web.
-
-### 3. Document-Exclusive Knowledge
-- Valuable empirical findings or formulas present only in the uploaded papers.
-
-### 4. Recent Web-Exclusive Developments
-- Emerging breakthroughs, recent benchmarks, or industry shifts found only on the web.
-
-### 5. Verification Verdict & Evidence Integrity
-- Provide an overall assessment of reliability and point out any unverified hypotheses.
+1. Claims supported by both sources
+2. Information found only in the documents
+3. Information found only on the web
+4. Contradictions
+5. Unsupported claims
+6. Important information that should be used in the final report
 
 Rules:
-- Remain strictly analytical, scholarly, and unbiased.
-- Never invent citations or synthetic performance numbers.
+- Do not invent facts.
+- Do not invent statistics.
+- Clearly identify uncertainty.
 """
-    model = llm if llm is not None else get_llm(provider="groq" if os.environ.get("GROQ_API_KEY") else "ollama")
-    response = model.invoke(prompt)
 
-    return response.content if hasattr(response, "content") else str(response)
+    answer = llm.invoke(prompt)
+
+    return answer
