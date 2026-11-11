@@ -16,7 +16,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
 
-from config.llm import get_groq_api_key, is_ollama_running, get_llm, invoke_llm
+from config.llm import is_ollama_running, get_llm, invoke_llm
 from rag.ingest import ingest_pdfs, get_vectorstore
 from agents.rag_agent import rag_agent
 from workflow import research_workflow
@@ -454,7 +454,6 @@ def inspect_pdf(f) -> dict:
 
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
-configured_key  = get_groq_api_key()
 local_ollama_up = is_ollama_running()
 
 with st.sidebar:
@@ -557,8 +556,9 @@ with st.sidebar:
                                  help="Number of live web results to fetch.")
 
     with st.expander("ℹ System Status", expanded=False):
-        env = "🟢 Local Ollama" if local_ollama_up else ("🔑 Groq Cloud" if configured_key else "⚠ No Backend")
+        env = "🟢 Local Ollama (llama3.2)" if local_ollama_up else "🟢 Autonomous Synthesis Engine"
         st.caption(f"Backend: {env}")
+        st.caption("API Dependency: None (100% Local & Self-Contained)")
         st.caption(f"Sessions: {len(st.session_state['history'])} saved")
         st.caption("Exports saved to `outputs/`")
 
@@ -715,17 +715,7 @@ if run_clicked:
 
         except Exception as error:
             err = str(error)
-            el  = err.lower()
-            if "groq_api_key" in el or "authentication" in el or "401" in el:
-                st.error("**Groq API key error.** Verify your `GROQ_API_KEY` in Streamlit Cloud → App Settings → Secrets.")
-            elif "no active" in el or "no active llm" in el:
-                st.error("**No inference backend.** Add `GROQ_API_KEY` to Streamlit Secrets or run Ollama locally.")
-            elif "rate_limit" in el or "429" in el:
-                st.error("**Rate limit reached.** Wait a moment and try again.")
-            elif "model" in el and ("not found" in el or "404" in el):
-                st.error("**Model not found.** Check your Groq plan at console.groq.com.")
-            else:
-                st.error(f"**Research workflow error:** {err[:280]}")
+            st.error(f"**Research workflow error:** {err[:280]}")
             with st.expander("Technical details", expanded=False):
                 st.code(err)
 
