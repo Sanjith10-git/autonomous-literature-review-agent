@@ -1,358 +1,365 @@
 import os
 import io
+import re
 import html
 import json
 import uuid
+import math
 import tempfile
 from datetime import datetime
 import streamlit as st
+from pypdf import PdfReader
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER
-from reportlab.platypus import (
-    SimpleDocTemplate,
-    Paragraph,
-    Spacer,
-    HRFlowable
-)
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
 
-from config.llm import get_groq_api_key, is_ollama_running, get_llm
-from rag.ingest import ingest_pdfs
+from config.llm import get_groq_api_key, is_ollama_running, get_llm, invoke_llm
+from rag.ingest import ingest_pdfs, get_vectorstore
+from agents.rag_agent import rag_agent
 from workflow import research_workflow
 
 
-# --------------------------------------------------
-# PROJECT FOLDERS & SESSION DEFAULTS
-# --------------------------------------------------
-
-DATA_DIR = "data"
+# ── Directories ────────────────────────────────────────────────────────────────
+DATA_DIR   = "data"
 OUTPUT_DIR = "outputs"
-
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
-# --------------------------------------------------
-# PAGE CONFIGURATION
-# --------------------------------------------------
-
+# ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Autonomous Literature Review Assistance Agent",
+    page_icon="📚",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-if "history" not in st.session_state:
-    st.session_state["history"] = []
-if "active_review_id" not in st.session_state:
-    st.session_state["active_review_id"] = None
-if "topic_input" not in st.session_state:
-    st.session_state["topic_input"] = ""
-if "uploader_key" not in st.session_state:
-    st.session_state["uploader_key"] = 0
+
+# ── Session state ──────────────────────────────────────────────────────────────
+for _k, _v in {
+    "history": [],
+    "active_review_id": None,
+    "topic_input": "",
+    "uploader_key": 0,
+    "notes": "",
+    "qa_log": [],
+}.items():
+    if _k not in st.session_state:
+        st.session_state[_k] = _v
 
 
-# --------------------------------------------------
-# REFINED EDITORIAL DESIGN SYSTEM
-# --------------------------------------------------
-
+# ── Design system ──────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
 
-    html, body, [class*="css"] {
-        font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
+/* ── Global reset ── */
+html, body, [class*="css"] {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #0F172A;
+}
+code, pre { font-family: 'JetBrains Mono', monospace !important; }
 
-    code, pre {
-        font-family: 'IBM Plex Mono', monospace !important;
-    }
+/* ── Canvas ── */
+[data-testid="stHeader"] { background: transparent !important; }
+.block-container {
+    padding-top: 2.8rem !important;
+    padding-bottom: 5rem !important;
+    max-width: 950px !important;
+}
+[data-testid="stHeaderActionElements"] { display: none !important; }
 
-    /* Main canvas proportions */
-    .block-container {
-        padding-top: 2.25rem;
-        padding-bottom: 4rem;
-        max-width: 920px;
-    }
+/* ── Sidebar ── */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%) !important;
+    border-right: none !important;
+}
+[data-testid="stSidebar"] * { color: #CBD5E1 !important; }
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 { color: #F1F5F9 !important; }
 
-    /* Hide heading anchor icons */
-    [data-testid="stHeaderActionElements"] {
-        display: none !important;
-    }
+.sidebar-brand {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.2rem 0 1rem 0;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.sidebar-logo {
+    width: 38px; height: 38px; border-radius: 10px;
+    background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; flex-shrink: 0;
+}
+.sidebar-brand-title { font-size: 0.95rem; font-weight: 700; color: #F1F5F9 !important; line-height: 1.2; }
+.sidebar-brand-sub   { font-size: 0.7rem; color: #64748B !important; letter-spacing: 0.03em; }
 
-    /* Sidebar visual hierarchy */
-    [data-testid="stSidebar"] {
-        border-right: 1px solid rgba(148, 163, 184, 0.22);
-    }
-    .sidebar-brand {
-        display: flex;
-        align-items: center;
-        gap: 0.6rem;
-        padding-bottom: 0.85rem;
-        margin-bottom: 0.85rem;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.22);
-    }
-    .sidebar-brand-title {
-        font-size: 0.96rem;
-        font-weight: 700;
-        letter-spacing: -0.015em;
-        line-height: 1.2;
-    }
-    .sidebar-brand-sub {
-        font-size: 0.72rem;
-        color: #64748B;
-    }
-    .sidebar-section-label {
-        font-size: 0.72rem;
-        font-weight: 600;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: #64748B;
-        margin: 0.35rem 0 0.4rem 0;
-    }
+.sidebar-label {
+    font-size: 0.65rem; font-weight: 600; letter-spacing: 0.1em;
+    text-transform: uppercase; color: #475569 !important;
+    margin: 0.6rem 0 0.3rem 0;
+}
 
-    /* Left-aligned clean sidebar history buttons */
-    [data-testid="stSidebar"] [data-testid="stButton"] button {
-        justify-content: flex-start !important;
-        text-align: left !important;
-        border-radius: 7px !important;
-        font-size: 0.84rem !important;
-        font-weight: 500 !important;
-        padding: 0.45rem 0.65rem !important;
-        transition: background-color 0.15s ease, border-color 0.15s ease !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stButton"] button p {
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        width: 100%;
-    }
+[data-testid="stSidebar"] [data-testid="stButton"] button {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    color: #CBD5E1 !important;
+    border-radius: 8px !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+    padding: 0.4rem 0.65rem !important;
+    transition: all 0.15s ease !important;
+}
+[data-testid="stSidebar"] [data-testid="stButton"] button:hover {
+    background: rgba(99,102,241,0.18) !important;
+    border-color: rgba(99,102,241,0.4) !important;
+    color: #E2E8F0 !important;
+}
+[data-testid="stSidebar"] [data-testid="stButton"] button p {
+    white-space: nowrap !important; overflow: hidden !important;
+    text-overflow: ellipsis !important; width: 100%;
+}
 
-    /* Subtle hover-revealed popover triggers */
-    [data-testid="stPopover"] > button {
-        border-radius: 7px !important;
-        font-size: 0.8rem !important;
-        font-weight: 500 !important;
-        border: 1px solid rgba(148, 163, 184, 0.28) !important;
-        opacity: 0.82;
-        transition: opacity 0.15s ease, border-color 0.15s ease !important;
-    }
-    [data-testid="stPopover"] > button:hover {
-        opacity: 1;
-        border-color: #1D4ED8 !important;
-        color: #1D4ED8 !important;
-    }
+/* New Review button */
+.new-btn button {
+    background: linear-gradient(135deg, #6366F1, #8B5CF6) !important;
+    border: none !important; color: #FFFFFF !important;
+    font-weight: 600 !important; border-radius: 9px !important;
+}
+.new-btn button:hover { opacity: 0.9 !important; }
 
-    /* Editorial Top Header */
-    .hero-wrap {
-        padding-bottom: 1.25rem;
-        margin-bottom: 1.5rem;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.25);
-    }
-    .hero-accent {
-        width: 42px;
-        height: 4px;
-        background-color: #1E3A8A;
-        border-radius: 2px;
-        margin-bottom: 0.8rem;
-    }
-    .hero-title {
-        font-size: 1.95rem;
-        font-weight: 700;
-        letter-spacing: -0.025em;
-        line-height: 1.2;
-        margin: 0 0 0.45rem 0;
-    }
-    .hero-subtitle {
-        font-size: 0.96rem;
-        opacity: 0.76;
-        line-height: 1.55;
-        margin: 0;
-    }
+/* ── Hero header ── */
+.hero-wrap {
+    background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 60%, #1D4ED8 100%);
+    border-radius: 16px;
+    padding: 2.4rem 2.6rem;
+    margin-bottom: 1.8rem;
+    position: relative;
+    overflow: hidden;
+}
+.hero-wrap::before {
+    content: '';
+    position: absolute; top: -40px; right: -40px;
+    width: 220px; height: 220px; border-radius: 50%;
+    background: rgba(99,102,241,0.18);
+}
+.hero-wrap::after {
+    content: '';
+    position: absolute; bottom: -60px; right: 80px;
+    width: 150px; height: 150px; border-radius: 50%;
+    background: rgba(139,92,246,0.12);
+}
+.hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 20px; padding: 0.25rem 0.9rem;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: #A5B4FC;
+    margin-bottom: 1rem;
+}
+.hero-title {
+    font-size: 2.1rem; font-weight: 800;
+    color: #FFFFFF; letter-spacing: -0.03em;
+    line-height: 1.18; margin: 0 0 0.75rem 0;
+}
+.hero-subtitle {
+    font-size: 0.97rem; color: rgba(255,255,255,0.68);
+    line-height: 1.6; margin: 0;
+    max-width: 540px;
+}
+.hero-badges {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    margin-top: 1.4rem;
+}
+.hero-badge {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 6px; padding: 0.22rem 0.65rem;
+    font-size: 0.72rem; font-weight: 500; color: #C7D2FE;
+}
 
-    /* Elevated paper-like containers */
-    [data-testid="stVerticalBlockBorderWrapper"] {
-        border-radius: 12px !important;
-        border: 1px solid rgba(148, 163, 184, 0.26) !important;
-        box-shadow: 0 8px 26px -8px rgba(15, 23, 42, 0.07) !important;
-        padding: 0.35rem 0.25rem !important;
-    }
+/* ── Cards ── */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border-radius: 14px !important;
+    border: 1px solid #E2E8F0 !important;
+    box-shadow: 0 2px 12px -4px rgba(15,23,42,0.08), 0 1px 3px rgba(15,23,42,0.05) !important;
+    background: #FFFFFF !important;
+}
 
-    /* Clean text input & dropzone */
-    [data-testid="stTextInput"] input {
-        border-radius: 8px !important;
-        padding: 0.58rem 0.8rem !important;
-        font-size: 0.94rem !important;
-    }
-    [data-testid="stTextInput"] input:focus {
-        border-color: #1D4ED8 !important;
-        box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.14) !important;
-    }
-    [data-testid="stFileUploaderDropzone"] {
-        border-radius: 10px !important;
-        border: 1.5px dashed rgba(100, 116, 139, 0.4) !important;
-        transition: border-color 0.2s ease;
-    }
-    [data-testid="stFileUploaderDropzone"]:hover {
-        border-color: #1D4ED8 !important;
-    }
+/* ── Input fields ── */
+[data-testid="stTextInput"] input, [data-testid="stTextArea"] textarea {
+    border-radius: 9px !important;
+    border-color: #CBD5E1 !important;
+    font-size: 0.93rem !important;
+    padding: 0.6rem 0.85rem !important;
+    background: #FAFBFF !important;
+    transition: all 0.2s ease !important;
+}
+[data-testid="stTextInput"] input:focus, [data-testid="stTextArea"] textarea:focus {
+    border-color: #6366F1 !important;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.15) !important;
+    background: #FFFFFF !important;
+}
 
-    /* Staged manuscript chips */
-    .staged-files {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.45rem;
-        margin: 0.35rem 0 0.85rem 0;
-    }
-    .staged-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.45rem;
-        padding: 0.3rem 0.65rem;
-        border-radius: 6px;
-        font-size: 0.8rem;
-        background: rgba(148, 163, 184, 0.1);
-        border: 1px solid rgba(148, 163, 184, 0.25);
-    }
-    .staged-size {
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 0.74rem;
-        color: #64748B;
-    }
+/* ── File uploader ── */
+[data-testid="stFileUploaderDropzone"] {
+    border-radius: 10px !important;
+    border: 2px dashed #CBD5E1 !important;
+    background: #F8FAFF !important;
+    transition: all 0.2s ease !important;
+}
+[data-testid="stFileUploaderDropzone"]:hover {
+    border-color: #6366F1 !important;
+    background: #F5F3FF !important;
+}
 
-    /* Primary & secondary buttons */
-    button[kind="primary"] {
-        background-color: #1E3A8A !important;
-        border-color: #1E3A8A !important;
-        color: #FFFFFF !important;
-        border-radius: 8px !important;
-        font-weight: 600 !important;
-        font-size: 0.94rem !important;
-        padding: 0.6rem 1.2rem !important;
-        box-shadow: 0 2px 6px rgba(30, 58, 138, 0.2) !important;
-        transition: background-color 0.18s ease, transform 0.15s ease, box-shadow 0.18s ease !important;
-    }
-    button[kind="primary"]:hover {
-        background-color: #1D4ED8 !important;
-        border-color: #1D4ED8 !important;
-        transform: translateY(-1px) !important;
-        box-shadow: 0 4px 12px rgba(29, 78, 216, 0.28) !important;
-    }
-    button[kind="secondary"] {
-        border-radius: 8px !important;
-        font-weight: 500 !important;
-        border-color: rgba(148, 163, 184, 0.35) !important;
-    }
-    button[kind="secondary"]:hover {
-        border-color: #1D4ED8 !important;
-        color: #1D4ED8 !important;
-    }
+/* ── Chips ── */
+.staged-files { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.4rem 0 0.5rem; }
+.staged-chip {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.25rem 0.65rem; border-radius: 20px;
+    font-size: 0.78rem; font-weight: 500;
+    background: #EEF2FF; border: 1px solid #C7D2FE; color: #4338CA;
+}
+.staged-meta { font-size: 0.7rem; color: #818CF8; }
 
-    /* Tabs accent */
-    button[data-baseweb="tab"][aria-selected="true"] {
-        color: #1D4ED8 !important;
-    }
-    [data-baseweb="tab-highlight"] {
-        background-color: #1D4ED8 !important;
-    }
+/* ── Primary button ── */
+button[kind="primary"] {
+    background: linear-gradient(135deg, #4F46E5, #7C3AED) !important;
+    border: none !important; color: #FFFFFF !important;
+    border-radius: 10px !important; font-weight: 700 !important;
+    font-size: 0.95rem !important; letter-spacing: 0.01em !important;
+    padding: 0.65rem 1.4rem !important;
+    box-shadow: 0 4px 14px rgba(79,70,229,0.35) !important;
+    transition: all 0.2s ease !important;
+}
+button[kind="primary"]:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 20px rgba(79,70,229,0.4) !important;
+}
 
-    /* Report metadata & reading flow */
-    .meta-strip {
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 0.76rem;
-        color: #64748B;
-        margin-top: -0.35rem;
-        margin-bottom: 0.9rem;
-    }
-    .report-body {
-        line-height: 1.72;
-        font-size: 0.96rem;
-    }
-    .report-body blockquote {
-        border-left: 3px solid #1D4ED8;
-        padding-left: 1rem;
-        opacity: 0.88;
-    }
+/* ── Tabs ── */
+button[data-baseweb="tab"] { font-weight: 500 !important; font-size: 0.88rem !important; }
+button[data-baseweb="tab"][aria-selected="true"] { color: #4F46E5 !important; }
+[data-baseweb="tab-highlight"] { background-color: #4F46E5 !important; }
+
+/* ── Report body ── */
+.report-body { line-height: 1.78; font-size: 0.95rem; }
+.report-body h1, .report-body h2 { letter-spacing: -0.02em; }
+.report-body blockquote {
+    border-left: 3px solid #6366F1; padding-left: 1rem;
+    color: #475569; font-style: italic;
+}
+
+/* ── Metric strip ── */
+.meta-strip {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    margin: 0.1rem 0 1rem;
+}
+.meta-pill {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    padding: 0.2rem 0.65rem; border-radius: 20px;
+    font-size: 0.74rem; font-weight: 500;
+    background: #F1F5F9; color: #475569;
+    border: 1px solid #E2E8F0;
+}
+
+/* ── QA log ── */
+.qa-entry { margin-bottom: 1rem; }
+.qa-q {
+    font-weight: 600; font-size: 0.88rem;
+    color: #4F46E5; margin-bottom: 0.25rem;
+}
+.qa-a {
+    font-size: 0.88rem; line-height: 1.65;
+    color: #334155; padding-left: 0.75rem;
+    border-left: 2px solid #E2E8F0;
+}
+
+/* ── Popover ── */
+[data-testid="stPopover"] > button {
+    border-radius: 8px !important; font-size: 0.8rem !important;
+    font-weight: 500 !important; border: 1px solid #E2E8F0 !important;
+    transition: all 0.15s ease !important;
+}
+[data-testid="stPopover"] > button:hover {
+    border-color: #6366F1 !important; color: #4F46E5 !important;
+}
+
+/* ── Info highlight box ── */
+.info-box {
+    background: #EEF2FF; border: 1px solid #C7D2FE;
+    border-radius: 10px; padding: 0.9rem 1.1rem;
+    font-size: 0.85rem; color: #3730A3; line-height: 1.6;
+    margin-bottom: 0.6rem;
+}
 </style>
 """, unsafe_allow_html=True)
 
 
-# --------------------------------------------------
-# PDF GENERATION FUNCTION
-# --------------------------------------------------
+# ── Helpers ────────────────────────────────────────────────────────────────────
 
 def create_pdf(report: str, topic: str) -> bytes:
-    buffer = io.BytesIO()
-
-    document = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        rightMargin=45,
-        leftMargin=45,
-        topMargin=45,
-        bottomMargin=45
-    )
-
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            rightMargin=50, leftMargin=50,
+                            topMargin=50, bottomMargin=50)
     styles = getSampleStyleSheet()
-
-    title_style = ParagraphStyle(
-        "ReportTitle",
-        parent=styles["Title"],
-        alignment=TA_CENTER,
-        textColor=colors.HexColor("#1E3A8A"),
-        fontSize=18,
-        leading=22,
-        spaceAfter=10
-    )
-
-    topic_style = ParagraphStyle(
-        "TopicHeader",
-        parent=styles["Heading2"],
-        textColor=colors.HexColor("#334155"),
-        fontSize=11,
-        leading=15,
-        spaceAfter=12
-    )
-
-    heading_style = styles["Heading2"]
-    subheading_style = styles["Heading3"]
-    body_style = styles["BodyText"]
+    title_style = ParagraphStyle("T", parent=styles["Title"],
+                                 alignment=TA_CENTER,
+                                 textColor=colors.HexColor("#1E3A8A"),
+                                 fontSize=17, leading=22, spaceAfter=8)
+    sub_style   = ParagraphStyle("S", parent=styles["Heading2"],
+                                 textColor=colors.HexColor("#334155"),
+                                 fontSize=11, leading=14, spaceAfter=10)
+    h2_style    = styles["Heading2"]
+    h3_style    = styles["Heading3"]
+    body_style  = styles["BodyText"]
 
     story = [
         Paragraph("Autonomous Literature Review Assistance Agent", title_style),
-        Paragraph("Research Topic: " + html.escape(topic), topic_style),
-        HRFlowable(width="100%", thickness=0.75, color=colors.HexColor("#CBD5E1"), spaceAfter=14)
+        Paragraph(f"Research Topic: {html.escape(topic)}", sub_style),
+        HRFlowable(width="100%", thickness=0.6,
+                   color=colors.HexColor("#CBD5E1"), spaceAfter=12),
     ]
-
     for line in report.splitlines():
         line = line.strip()
         if not line:
-            story.append(Spacer(1, 6))
-            continue
-
+            story.append(Spacer(1, 5)); continue
         if line.startswith("# "):
-            story.append(Paragraph(html.escape(line[2:]), heading_style))
+            story.append(Paragraph(html.escape(line[2:]), h2_style))
         elif line.startswith("## "):
-            story.append(Paragraph(html.escape(line[3:]), heading_style))
+            story.append(Paragraph(html.escape(line[3:]), h2_style))
         elif line.startswith("### "):
-            story.append(Paragraph(html.escape(line[4:]), subheading_style))
-        elif line.startswith("- ") or line.startswith("* "):
+            story.append(Paragraph(html.escape(line[4:]), h3_style))
+        elif line.startswith(("- ", "* ")):
             story.append(Paragraph("&bull; " + html.escape(line[2:]), body_style))
-            story.append(Spacer(1, 3))
+            story.append(Spacer(1, 2))
         else:
             story.append(Paragraph(html.escape(line), body_style))
-            story.append(Spacer(1, 5))
+            story.append(Spacer(1, 4))
+    doc.build(story)
+    return buf.getvalue()
 
-    document.build(story)
-    return buffer.getvalue()
+
+def word_count(text: str) -> int:
+    return len(text.split())
+
+
+def read_time(text: str) -> int:
+    return max(1, math.ceil(word_count(text) / 230))
 
 
 def get_active_review():
-    active_id = st.session_state.get("active_review_id")
+    aid = st.session_state.get("active_review_id")
     for item in st.session_state.get("history", []):
-        if item["id"] == active_id:
+        if item["id"] == aid:
             return item
     return None
 
@@ -361,23 +368,33 @@ def start_new_review():
     st.session_state["active_review_id"] = None
     st.session_state["topic_input"] = ""
     st.session_state["uploader_key"] += 1
+    st.session_state["qa_log"] = []
+    st.session_state["notes"] = ""
 
 
-# --------------------------------------------------
-# SIDEBAR: HISTORY & HIDDEN CONTROLS
-# --------------------------------------------------
+def inspect_pdf(f) -> dict:
+    try:
+        reader = PdfReader(io.BytesIO(f.getbuffer()))
+        pages = len(reader.pages)
+        meta  = reader.metadata or {}
+        title = meta.get("/Title", "").strip() or f.name
+        author= meta.get("/Author", "").strip() or "—"
+    except Exception:
+        pages, title, author = 0, f.name, "—"
+    size_kb = len(f.getbuffer()) / 1024
+    size_str = f"{size_kb:.0f} KB" if size_kb < 1024 else f"{size_kb/1024:.1f} MB"
+    return {"name": f.name, "title": title, "author": author,
+            "pages": pages, "size_str": size_str}
 
-configured_groq_key = get_groq_api_key()
+
+# ── Sidebar ────────────────────────────────────────────────────────────────────
+configured_key  = get_groq_api_key()
 local_ollama_up = is_ollama_running()
 
 with st.sidebar:
     st.markdown("""
     <div class="sidebar-brand">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E3A8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
-            <path d="M8 7h6"/>
-            <path d="M8 11h8"/>
-        </svg>
+        <div class="sidebar-logo">📚</div>
         <div>
             <div class="sidebar-brand-title">Literature Agent</div>
             <div class="sidebar-brand-sub">Research Workspace</div>
@@ -385,24 +402,25 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    if st.button("+ New Review", use_container_width=True):
-        start_new_review()
-        st.rerun()
+    st.markdown('<div class="new-btn">', unsafe_allow_html=True)
+    if st.button("＋ New Review", use_container_width=True):
+        start_new_review(); st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
     st.write("")
 
-    # History header + hidden Manage popover
-    hist_hdr_col, hist_mgr_col = st.columns([1.8, 1])
-    with hist_hdr_col:
-        st.markdown('<div class="sidebar-section-label">History</div>', unsafe_allow_html=True)
-    with hist_mgr_col:
+    # ── History ──
+    h_col, m_col = st.columns([1.7, 1])
+    with h_col:
+        st.markdown('<div class="sidebar-label">Review History</div>', unsafe_allow_html=True)
+    with m_col:
         if st.session_state["history"]:
             with st.popover("Manage", use_container_width=True):
-                if st.session_state.get("active_review_id"):
-                    if st.button("Delete Active Review", use_container_width=True):
+                aid = st.session_state.get("active_review_id")
+                if aid:
+                    if st.button("🗑 Delete Active", use_container_width=True):
                         st.session_state["history"] = [
-                            h for h in st.session_state["history"]
-                            if h["id"] != st.session_state["active_review_id"]
+                            h for h in st.session_state["history"] if h["id"] != aid
                         ]
                         st.session_state["active_review_id"] = (
                             st.session_state["history"][0]["id"]
@@ -410,295 +428,256 @@ with st.sidebar:
                         )
                         st.rerun()
 
-                history_json = json.dumps([
-                    {
-                        "topic": h["topic"],
-                        "timestamp": h["timestamp"],
-                        "files": h["files"],
-                        "report": h["report"],
-                        "verification": h["verification"]
-                    }
-                    for h in st.session_state["history"]
-                ], indent=2)
-
                 st.download_button(
-                    "Export All (.json)",
-                    data=history_json,
+                    "⬇ Export All (.json)",
+                    data=json.dumps([{
+                        "topic": h["topic"], "timestamp": h["timestamp"],
+                        "files": h["files"], "report": h["report"],
+                        "verification": h.get("verification", "")
+                    } for h in st.session_state["history"]], indent=2),
                     file_name="research_history.json",
                     mime="application/json",
                     use_container_width=True
                 )
-
-                if st.button("Clear All History", use_container_width=True):
+                if st.button("🧹 Clear All", use_container_width=True):
                     st.session_state["history"] = []
                     st.session_state["active_review_id"] = None
                     st.rerun()
 
-    # History list
     if not st.session_state["history"]:
-        st.caption("Completed reviews will be listed here.")
+        st.caption("Completed reviews appear here.")
     else:
         for item in st.session_state["history"]:
-            is_active = (item["id"] == st.session_state.get("active_review_id"))
-            label = f"> {item['topic']}" if is_active else item["topic"]
-            if st.button(
-                label,
-                key=f"hist_{item['id']}",
-                help=f"{item['timestamp']} • {len(item['files'])} file(s)",
-                use_container_width=True
-            ):
+            is_active = item["id"] == st.session_state.get("active_review_id")
+            label = ("▶ " if is_active else "") + item["topic"]
+            if st.button(label, key=f"hist_{item['id']}",
+                         help=f"{item['timestamp']} · {len(item['files'])} file(s)",
+                         use_container_width=True):
                 st.session_state["active_review_id"] = item["id"]
+                st.session_state["qa_log"]  = item.get("qa_log", [])
+                st.session_state["notes"]   = item.get("notes", "")
                 st.rerun()
 
     st.divider()
 
-    # Hidden / collapsed Settings panel
-    with st.expander("Settings & Model Options", expanded=False):
-        provider_choice = st.selectbox(
-            "Inference Backend",
-            ["Auto", "Groq Cloud", "Local Ollama"],
+    # ── Research Preferences ──
+    with st.expander("⚙ Research Preferences", expanded=True):
+        source_scope = st.selectbox(
+            "Source Scope",
+            ["Uploaded Manuscripts + Web", "Uploaded Manuscripts Only", "Web Discovery Only"],
             index=0
         )
-        provider_key = (
-            "auto" if provider_choice == "Auto"
-            else "groq" if provider_choice == "Groq Cloud"
-            else "ollama"
+        source_mode_key = {
+            "Uploaded Manuscripts + Web": "both",
+            "Uploaded Manuscripts Only":  "docs_only",
+            "Web Discovery Only":          "web_only",
+        }[source_scope]
+
+        review_focus = st.selectbox(
+            "Review Focus",
+            ["Comprehensive Review", "Methodology Analysis",
+             "Findings & Results", "Research Gaps", "Comparative Analysis"],
+            index=0
         )
 
-        if provider_key == "ollama" or (provider_key == "auto" and local_ollama_up):
-            selected_model = st.selectbox(
-                "Model",
-                ["llama3.2", "mistral", "deepseek-r1"],
-                index=0
-            )
-        else:
-            selected_model = st.selectbox(
-                "Model",
-                ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"],
-                index=0
-            )
-
-        groq_key_sidebar = st.text_input(
-            "Groq API Key",
-            value=configured_groq_key,
-            type="password",
-            placeholder="gsk_...",
-            help="Optional locally when Ollama is running; required on cloud unless stored in Secrets."
+        writing_style = st.selectbox(
+            "Writing Style",
+            ["Academic Prose", "Structured Bullet Points",
+             "Executive Summary", "Technical Report"],
+            index=0
         )
 
-        include_web = st.checkbox("Include Web Search", value=True)
-        search_depth = st.slider("Web Sources", min_value=3, max_value=8, value=5)
-        temperature = st.slider("Temperature", min_value=0.0, max_value=0.5, value=0.0, step=0.1)
+        search_depth = st.slider("Web Sources", 3, 10, 5,
+                                 help="Number of live web results to fetch.")
 
-        if st.button("Test Engine Connection", use_container_width=True):
-            try:
-                test_llm = get_llm(
-                    api_key=groq_key_sidebar.strip() or None,
-                    model=selected_model,
-                    provider=provider_key,
-                    temperature=temperature
-                )
-                reply = test_llm.invoke("Respond with 'Ready' in one word.")
-                msg = reply.content if hasattr(reply, "content") else str(reply)
-                st.success(f"Connected: {msg[:30]}")
-            except Exception as exc:
-                st.error(f"Connection check failed: {str(exc)[:110]}")
-
-    with st.expander("Workspace Info", expanded=False):
-        env_label = "Local Ollama Active" if local_ollama_up else "Cloud Mode"
-        st.caption(f"Environment: {env_label}")
-        st.caption(f"Saved Reviews: {len(st.session_state['history'])}")
-        st.caption("Local Export Path: `outputs/`")
+    with st.expander("ℹ System Status", expanded=False):
+        env = "🟢 Local Ollama" if local_ollama_up else ("🔑 Groq Cloud" if configured_key else "⚠ No Backend")
+        st.caption(f"Backend: {env}")
+        st.caption(f"Sessions: {len(st.session_state['history'])} saved")
+        st.caption("Exports saved to `outputs/`")
 
 
-# --------------------------------------------------
-# MAIN WORKSPACE HEADER + HIDDEN SAMPLE TOPICS
-# --------------------------------------------------
-
-hdr_col, tool_col = st.columns([4.2, 1.1])
-
-with hdr_col:
-    st.markdown("""
-    <div class="hero-wrap">
-        <div class="hero-accent"></div>
-        <h1 class="hero-title">Autonomous Literature Review Assistance Agent</h1>
-        <p class="hero-subtitle">
-            Upload peer-reviewed manuscripts and specify a research topic to generate a verified, citation-backed synthesis report.
-        </p>
+# ── Hero header ───────────────────────────────────────────────────────────────
+st.markdown("""
+<div class="hero-wrap">
+    <div class="hero-eyebrow">🔬 AI Research Platform</div>
+    <h1 class="hero-title">Autonomous Literature Review<br>Assistance Agent</h1>
+    <p class="hero-subtitle">
+        Upload peer-reviewed manuscripts and define a research topic to generate a
+        verified, citation-backed synthesis report — powered by multi-agent AI.
+    </p>
+    <div class="hero-badges">
+        <span class="hero-badge">📄 Document Indexing</span>
+        <span class="hero-badge">🌐 Live Web Discovery</span>
+        <span class="hero-badge">✅ Claim Verification</span>
+        <span class="hero-badge">📊 Synthesis Report</span>
+        <span class="hero-badge">📥 PDF Export</span>
     </div>
-    """, unsafe_allow_html=True)
-
-with tool_col:
-    st.write("")
-    st.write("")
-    with st.popover("Sample Topics", use_container_width=True):
-        st.caption("Load a topic into the workspace:")
-        samples = [
-            "Generative AI applications in clinical diagnostics",
-            "Retrieval-augmented generation for hallucination mitigation",
-            "Transformer attention mechanisms in long-context modeling",
-            "Autonomous multi-agent workflows in scientific discovery"
-        ]
-        for idx, sample in enumerate(samples):
-            if st.button(sample, key=f"sample_{idx}", use_container_width=True):
-                st.session_state["topic_input"] = sample
-                st.rerun()
+</div>
+""", unsafe_allow_html=True)
 
 
-# --------------------------------------------------
-# RESEARCH INPUT CARD
-# --------------------------------------------------
-
+# ── Research Input Card ────────────────────────────────────────────────────────
 with st.container(border=True):
+
+    # Topic row + sample popover
+    t_col, s_col = st.columns([3.6, 1])
+    with t_col:
+        st.markdown("**Research Topic**")
+    with s_col:
+        with st.popover("💡 Samples", use_container_width=True):
+            st.caption("Click to load a topic:")
+            for idx, sample in enumerate([
+                "Generative AI in clinical diagnostics",
+                "Retrieval-augmented generation for hallucination mitigation",
+                "Transformer attention in long-context modeling",
+                "Multi-agent workflows in scientific discovery",
+                "Federated learning for privacy-preserving healthcare AI",
+                "Large language models in drug discovery pipelines",
+            ]):
+                if st.button(sample, key=f"sample_{idx}", use_container_width=True):
+                    st.session_state["topic_input"] = sample
+                    st.rerun()
+
     topic = st.text_input(
         "Research Topic",
         key="topic_input",
-        placeholder="Example: Generative AI applications in clinical diagnostics"
+        placeholder="e.g. Generative AI applications in clinical diagnostics",
+        label_visibility="collapsed"
     )
 
-    uploaded_files = st.file_uploader(
-        "Research Papers (PDF)",
-        type=["pdf"],
-        accept_multiple_files=True,
-        key=f"uploader_{st.session_state['uploader_key']}"
-    )
+    st.write("")
 
+    # PDF uploader (hidden when web-only)
+    if source_mode_key != "web_only":
+        uploaded_files = st.file_uploader(
+            "Research Papers (PDF)",
+            type=["pdf"],
+            accept_multiple_files=True,
+            key=f"uploader_{st.session_state['uploader_key']}",
+            help="Upload one or more peer-reviewed PDF manuscripts."
+        )
+    else:
+        uploaded_files = []
+        st.info("**Web Discovery Only** mode — no PDFs required. Live sources will be gathered automatically.")
+
+    staged_meta = []
     if uploaded_files:
+        staged_meta = [inspect_pdf(f) for f in uploaded_files]
         chips_html = "".join(
-            f'<span class="staged-chip">{html.escape(f.name)}'
-            f'<span class="staged-size">{len(f.getbuffer()) / 1024:.1f} KB</span></span>'
-            for f in uploaded_files
+            f'<span class="staged-chip">📄 {html.escape(m["name"])}'
+            f' <span class="staged-meta">{m["pages"]} pg · {m["size_str"]}</span></span>'
+            for m in staged_meta
         )
         st.markdown(f'<div class="staged-files">{chips_html}</div>', unsafe_allow_html=True)
 
-    active_api_key = groq_key_sidebar.strip() or configured_groq_key
-    needs_key_inline = (
-        provider_key == "groq" or (provider_key == "auto" and not local_ollama_up)
-    ) and not active_api_key
+        # PDF metadata inspector
+        with st.expander("📋 Manuscript Details", expanded=False):
+            for m in staged_meta:
+                st.markdown(
+                    f"**{html.escape(m['title'])}**  \n"
+                    f"Author: `{html.escape(m['author'])}` · Pages: `{m['pages']}` · Size: `{m['size_str']}`"
+                )
 
-    if needs_key_inline:
-        inline_key = st.text_input(
-            "Groq API Key",
-            type="password",
-            placeholder="gsk_...",
-            help="Enter your Groq key here or configure GROQ_API_KEY in App Secrets (also configurable in Sidebar Settings)."
-        )
-        if inline_key.strip():
-            active_api_key = inline_key.strip()
-
-    run_clicked = st.button(
-        "Start Research",
-        type="primary",
-        use_container_width=True
-    )
+    st.write("")
+    run_clicked = st.button("🔍 Start Research", type="primary", use_container_width=True)
 
 
-# --------------------------------------------------
-# WORKFLOW EXECUTION
-# --------------------------------------------------
-
+# ── Workflow Execution ─────────────────────────────────────────────────────────
 if run_clicked:
-
     if not topic.strip():
-
         st.error("Please enter a research topic.")
-
-    elif not uploaded_files:
-
-        st.error("Please upload at least one PDF research paper.")
-
-    elif (provider_key == "groq" or (provider_key == "auto" and not local_ollama_up)) and not active_api_key:
-
-        st.error(
-            "Please provide a Groq API Key (above or inside Sidebar -> Settings & Model Options) "
-            "or add `GROQ_API_KEY` to Streamlit Cloud Secrets."
-        )
-
+    elif source_mode_key != "web_only" and not uploaded_files:
+        st.error("Upload at least one PDF, or switch to **Web Discovery Only** in Research Preferences.")
     else:
-
         try:
+            with st.status("Running literature review…", expanded=True) as status:
 
-            with st.status("Running literature review...", expanded=True) as status:
+                active_vs = None
+                if source_mode_key != "web_only" and uploaded_files:
+                    st.write("📂 Parsing uploaded PDF manuscripts…")
+                    temp_dir = tempfile.mkdtemp()
+                    uploaded_paths = []
+                    for uf in uploaded_files:
+                        fp = os.path.join(temp_dir, os.path.basename(uf.name))
+                        with open(fp, "wb") as fh:
+                            fh.write(uf.getbuffer())
+                        uploaded_paths.append(fp)
 
-                st.write("Saving uploaded PDF files...")
-                temp_dir = tempfile.mkdtemp()
-                uploaded_paths = []
-                file_names = []
-                for uploaded_file in uploaded_files:
-                    fname = os.path.basename(uploaded_file.name)
-                    file_path = os.path.join(temp_dir, fname)
-                    with open(file_path, "wb") as file:
-                        file.write(uploaded_file.getbuffer())
-                    uploaded_paths.append(file_path)
-                    file_names.append(fname)
+                    st.write("🧩 Indexing semantic chunks into vector store…")
+                    active_vs = ingest_pdfs(pdf_paths=uploaded_paths)
 
-                st.write("Indexing manuscripts into vector store...")
-                ingest_pdfs(pdf_paths=uploaded_paths, provider=provider_key)
-
-                st.write("Retrieving document evidence, searching web literature, and verifying claims...")
+                st.write("🤖 Running document retrieval, web search, verification & synthesis…")
                 result = research_workflow.invoke({
-                    "topic": topic.strip(),
-                    "rag_result": "",
-                    "web_result": "",
+                    "topic":        topic.strip(),
+                    "rag_result":   "",
+                    "web_result":   "",
                     "verification": "",
-                    "report": "",
-                    "api_key": active_api_key or None,
-                    "provider": provider_key,
-                    "model": selected_model,
-                    "temperature": temperature,
-                    "max_results": search_depth,
-                    "include_web": include_web
+                    "report":       "",
+                    "max_results":  search_depth,
+                    "source_mode":  source_mode_key,
+                    "review_focus": review_focus,
+                    "writing_style": writing_style,
+                    "vectorstore":  active_vs,
                 })
 
                 report = result["report"]
 
-                st.write("Generating Markdown and PDF copies...")
-                markdown_path = os.path.join(OUTPUT_DIR, "research_report.md")
-                with open(markdown_path, "w", encoding="utf-8") as file:
-                    file.write(report)
+                st.write("📄 Generating Markdown and PDF deliverables…")
+                md_path = os.path.join(OUTPUT_DIR, "research_report.md")
+                with open(md_path, "w", encoding="utf-8") as fh:
+                    fh.write(report)
 
                 pdf_bytes = create_pdf(report, topic.strip())
                 pdf_path = os.path.join(OUTPUT_DIR, "research_report.pdf")
-                with open(pdf_path, "wb") as file:
-                    file.write(pdf_bytes)
+                with open(pdf_path, "wb") as fh:
+                    fh.write(pdf_bytes)
 
-                review_entry = {
-                    "id": uuid.uuid4().hex[:8],
-                    "topic": topic.strip(),
-                    "timestamp": datetime.now().strftime("%H:%M • %d %b %Y"),
-                    "files": file_names,
-                    "report": report,
-                    "pdf": pdf_bytes,
-                    "rag_result": result.get("rag_result", ""),
-                    "web_result": result.get("web_result", ""),
-                    "verification": result.get("verification", "")
+                entry = {
+                    "id":           uuid.uuid4().hex[:8],
+                    "topic":        topic.strip(),
+                    "timestamp":    datetime.now().strftime("%H:%M · %d %b %Y"),
+                    "mode":         source_scope,
+                    "focus":        review_focus,
+                    "style":        writing_style,
+                    "files":        [m["name"] for m in staged_meta],
+                    "staged_meta":  staged_meta,
+                    "report":       report,
+                    "pdf":          pdf_bytes,
+                    "rag_result":   result.get("rag_result", ""),
+                    "web_result":   result.get("web_result", ""),
+                    "verification": result.get("verification", ""),
+                    "vectorstore":  active_vs,
+                    "qa_log":       [],
+                    "notes":        "",
                 }
 
-                st.session_state["history"].insert(0, review_entry)
-                st.session_state["active_review_id"] = review_entry["id"]
+                st.session_state["history"].insert(0, entry)
+                st.session_state["active_review_id"] = entry["id"]
+                st.session_state["qa_log"]  = []
+                st.session_state["notes"]   = ""
 
-                status.update(label="Research completed.", state="complete", expanded=False)
+                status.update(label="✅ Research completed.", state="complete", expanded=False)
                 st.rerun()
 
         except Exception as error:
-
-            err_msg = str(error)
-            if "no active llm backend" in err_msg.lower() or "ollama" in err_msg.lower() or "connection" in err_msg.lower():
-                st.error(
-                    "Unable to reach an active LLM backend. Configure `GROQ_API_KEY` in App Secrets or Sidebar Settings, "
-                    "or ensure Ollama is running locally."
-                )
+            err = str(error)
+            el  = err.lower()
+            if "groq_api_key" in el or "authentication" in el or "401" in el:
+                st.error("**Groq API key error.** Verify your `GROQ_API_KEY` in Streamlit Cloud → App Settings → Secrets.")
+            elif "no active" in el or "no active llm" in el:
+                st.error("**No inference backend.** Add `GROQ_API_KEY` to Streamlit Secrets or run Ollama locally.")
+            elif "rate_limit" in el or "429" in el:
+                st.error("**Rate limit reached.** Wait a moment and try again.")
+            elif "model" in el and ("not found" in el or "404" in el):
+                st.error("**Model not found.** Check your Groq plan at console.groq.com.")
             else:
-                st.error("The research workflow failed during execution.")
+                st.error(f"**Research workflow error:** {err[:280]}")
+            with st.expander("Technical details", expanded=False):
+                st.code(err)
 
-            with st.expander("Technical error details"):
-                st.code(err_msg)
 
-
-# --------------------------------------------------
-# GENERATED REPORT (ACTIVE OR SELECTED FROM HISTORY)
-# --------------------------------------------------
-
+# ── Report Console ─────────────────────────────────────────────────────────────
 active_review = get_active_review()
 
 if active_review:
@@ -706,66 +685,172 @@ if active_review:
     st.write("")
     with st.container(border=True):
 
-        header_left, header_right = st.columns([2.2, 1.35])
-        with header_left:
-            st.subheader("Research Report")
-            st.markdown(
-                f'<div class="meta-strip">Topic: {html.escape(active_review["topic"])} &nbsp;|&nbsp; '
-                f'{active_review["timestamp"]} &nbsp;|&nbsp; {len(active_review["files"])} manuscript(s)</div>',
-                unsafe_allow_html=True
-            )
+        # Header row
+        h_left, h_right = st.columns([2.5, 1.5])
+        with h_left:
+            st.markdown(f"### 📑 Research Report")
 
-        with header_right:
-            act_col1, act_col2, act_col3 = st.columns([1, 1, 0.95])
-            with act_col1:
-                st.download_button(
-                    label="Markdown",
-                    data=active_review["report"],
-                    file_name="research_report.md",
-                    mime="text/markdown",
-                    use_container_width=True
-                )
-            with act_col2:
-                st.download_button(
-                    label="PDF",
-                    data=active_review["pdf"],
-                    file_name="research_report.pdf",
-                    mime="application/pdf",
-                    use_container_width=True
-                )
-            with act_col3:
-                with st.popover("More", use_container_width=True):
-                    st.caption("Manuscripts indexed:")
-                    for fname in active_review["files"]:
-                        st.markdown(f"- `{fname}`")
-                    st.divider()
-                    if st.button("Hide View", use_container_width=True):
-                        st.session_state["active_review_id"] = None
-                        st.rerun()
+            wc  = word_count(active_review["report"])
+            rt  = read_time(active_review["report"])
+            pills = [
+                f"🗂 {active_review['topic'][:40]}{'…' if len(active_review['topic'])>40 else ''}",
+                f"🕐 {active_review['timestamp']}",
+                f"📄 {len(active_review['files'])} manuscript(s)",
+                f"📝 {wc:,} words",
+                f"⏱ ~{rt} min read",
+                f"🎯 {active_review.get('focus','—')}",
+            ]
+            pills_html = "".join(f'<span class="meta-pill">{p}</span>' for p in pills)
+            st.markdown(f'<div class="meta-strip">{pills_html}</div>', unsafe_allow_html=True)
 
-        tab_report, tab_verification, tab_evidence = st.tabs([
-            "Report",
-            "Cross-Verification",
-            "Sources & Retrieval"
+        with h_right:
+            dl1, dl2, dl3 = st.columns([1,1,1])
+            with dl1:
+                st.download_button("⬇ MD",  data=active_review["report"],
+                                   file_name="report.md", mime="text/markdown",
+                                   use_container_width=True)
+            with dl2:
+                st.download_button("⬇ PDF", data=active_review["pdf"],
+                                   file_name="report.pdf", mime="application/pdf",
+                                   use_container_width=True)
+            with dl3:
+                st.download_button("⬇ TXT", data=active_review["report"],
+                                   file_name="report.txt", mime="text/plain",
+                                   use_container_width=True)
+
+        st.divider()
+
+        # ── Tabs ──────────────────────────────────────────────────────────────
+        (tab_report, tab_qa, tab_notes,
+         tab_verify, tab_evidence) = st.tabs([
+            "📄 Report",
+            "💬 Ask Manuscripts",
+            "📝 Research Notes",
+            "✅ Verification",
+            "🔍 Evidence & Sources",
         ])
 
+        # ── Report tab ────────────────────────────────────────────────────────
         with tab_report:
-            st.markdown('<div class="report-body">', unsafe_allow_html=True)
-            st.markdown(active_review["report"])
-            st.markdown('</div>', unsafe_allow_html=True)
+            search_term = st.text_input(
+                "Search in report", placeholder="Keyword to highlight…",
+                label_visibility="visible", key="report_search"
+            )
 
-        with tab_verification:
+            report_text = active_review["report"]
+            if search_term.strip():
+                highlighted = re.sub(
+                    f"({re.escape(search_term)})",
+                    r'<mark style="background:#FDE68A;border-radius:3px;">\1</mark>',
+                    report_text, flags=re.IGNORECASE
+                )
+                st.markdown(f'<div class="report-body">{highlighted}</div>',
+                            unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="report-body">', unsafe_allow_html=True)
+                st.markdown(report_text)
+                st.markdown('</div>', unsafe_allow_html=True)
+
+        # ── Q&A tab ───────────────────────────────────────────────────────────
+        with tab_qa:
+            st.markdown('<div class="info-box">Ask specific questions about the uploaded manuscripts. '
+                        'The agent retrieves relevant passages and answers using your documents only.</div>',
+                        unsafe_allow_html=True)
+
+            qa_q = st.text_input("Your question", placeholder="What methodology did the authors use?",
+                                 key="qa_input")
+            if st.button("Ask", key="qa_ask", type="primary"):
+                if not qa_q.strip():
+                    st.warning("Enter a question first.")
+                elif not active_review.get("vectorstore"):
+                    st.warning("No vector store for this review — Q&A requires uploaded PDFs.")
+                else:
+                    with st.spinner("Searching manuscripts…"):
+                        try:
+                            answer = rag_agent(
+                                qa_q.strip(),
+                                vectorstore=active_review["vectorstore"]
+                            )
+                            log_entry = {"q": qa_q.strip(), "a": answer,
+                                         "ts": datetime.now().strftime("%H:%M")}
+                            st.session_state["qa_log"].append(log_entry)
+                            # persist into history entry
+                            for h in st.session_state["history"]:
+                                if h["id"] == active_review["id"]:
+                                    h.setdefault("qa_log", []).append(log_entry)
+                        except Exception as e:
+                            st.error(f"Q&A failed: {str(e)[:200]}")
+
+            qa_log = st.session_state.get("qa_log", [])
+            if qa_log:
+                st.write("")
+                for entry in reversed(qa_log):
+                    st.markdown(
+                        f'<div class="qa-entry">'
+                        f'<div class="qa-q">🗨 {html.escape(entry["q"])}'
+                        f'<span style="font-size:0.68rem;color:#94A3B8;font-weight:400;margin-left:0.5rem;">{entry["ts"]}</span></div>'
+                        f'<div class="qa-a">{html.escape(entry["a"])}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                if st.button("Clear Q&A log", key="clear_qa"):
+                    st.session_state["qa_log"] = []
+                    for h in st.session_state["history"]:
+                        if h["id"] == active_review["id"]:
+                            h["qa_log"] = []
+                    st.rerun()
+
+        # ── Notes tab ─────────────────────────────────────────────────────────
+        with tab_notes:
+            st.markdown('<div class="info-box">Your personal research scratchpad — '
+                        'observations, follow-up ideas, and annotations are saved per session.</div>',
+                        unsafe_allow_html=True)
+
+            notes_val = st.text_area(
+                "Research Notes", value=st.session_state.get("notes", ""),
+                height=320, placeholder="Add your annotations, follow-up questions, or key takeaways here…",
+                label_visibility="collapsed", key="notes_editor"
+            )
+            n_col1, n_col2 = st.columns([1, 1])
+            with n_col1:
+                if st.button("💾 Save Notes", use_container_width=True):
+                    st.session_state["notes"] = notes_val
+                    for h in st.session_state["history"]:
+                        if h["id"] == active_review["id"]:
+                            h["notes"] = notes_val
+                    st.success("Notes saved.")
+            with n_col2:
+                st.download_button(
+                    "⬇ Export Notes (.txt)",
+                    data=notes_val,
+                    file_name=f"notes_{active_review['id']}.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )
+
+        # ── Verification tab ──────────────────────────────────────────────────
+        with tab_verify:
             if active_review.get("verification"):
                 st.markdown(active_review["verification"])
             else:
-                st.caption("No verification output recorded for this review.")
+                st.caption("No verification data for this review.")
 
+        # ── Evidence tab ──────────────────────────────────────────────────────
         with tab_evidence:
+            if active_review.get("staged_meta"):
+                st.markdown("#### Indexed Manuscripts")
+                for m in active_review["staged_meta"]:
+                    with st.expander(f"📄 {m['title']}", expanded=False):
+                        st.markdown(f"- **File:** `{m['name']}`")
+                        st.markdown(f"- **Author:** {m['author']}")
+                        st.markdown(f"- **Pages:** {m['pages']} · **Size:** {m['size_str']}")
+                st.divider()
+
             if active_review.get("rag_result"):
-                st.markdown("#### Uploaded Document Findings")
+                st.markdown("#### Document Retrieval Findings")
                 st.markdown(active_review["rag_result"])
                 st.divider()
 
             if active_review.get("web_result"):
-                st.markdown("#### Web Search Findings")
+                st.markdown("#### Live Web Search Findings")
                 st.markdown(active_review["web_result"])
