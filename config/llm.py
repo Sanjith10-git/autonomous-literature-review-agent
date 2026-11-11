@@ -43,12 +43,12 @@ def get_groq_api_key() -> str:
     return ""
 
 
-def get_embeddings() -> Embeddings:
+def get_embeddings(provider: str = "auto") -> Embeddings:
     """
-    Returns Ollama embeddings when a local Ollama daemon is running;
+    Returns Ollama embeddings when local Ollama is selected/running;
     otherwise uses Chroma's zero-dependency in-memory ONNX embeddings.
     """
-    if is_ollama_running():
+    if provider != "groq" and is_ollama_running():
         try:
             from langchain_ollama import OllamaEmbeddings
             return OllamaEmbeddings(model="nomic-embed-text")
@@ -58,21 +58,33 @@ def get_embeddings() -> Embeddings:
     return ChromaDefaultEmbeddings()
 
 
-def get_llm(api_key: Optional[str] = None, temperature: float = 0):
+def get_llm(
+    api_key: Optional[str] = None,
+    model: Optional[str] = None,
+    provider: str = "auto",
+    temperature: float = 0
+):
     """
-    Returns local ChatOllama when Ollama is running locally (unless an explicit
-    cloud key override is needed), or ChatGroq on cloud deployments.
+    Resolves and returns the active ChatModel for local Ollama or Groq Cloud.
     """
     explicit_key = (api_key or "").strip()
+    selected_provider = (provider or "auto").lower()
 
-    if not explicit_key and is_ollama_running():
+    if selected_provider == "ollama" or (
+        selected_provider == "auto" and not explicit_key and is_ollama_running()
+    ):
         from langchain_ollama import ChatOllama
-        return ChatOllama(model="llama3.2", temperature=temperature)
+        return ChatOllama(model=model or "llama3.2", temperature=temperature)
 
     key = explicit_key or get_groq_api_key()
-    if key:
+    if key and selected_provider in ("auto", "groq"):
         from langchain_groq import ChatGroq
-        for candidate_model in ("openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"):
+        candidates = [model] if model else []
+        for c in ("openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"):
+            if c not in candidates:
+                candidates.append(c)
+
+        for candidate_model in candidates:
             try:
                 return ChatGroq(
                     groq_api_key=key,
@@ -82,9 +94,9 @@ def get_llm(api_key: Optional[str] = None, temperature: float = 0):
             except Exception:
                 continue
 
-    if is_ollama_running():
+    if selected_provider == "auto" and is_ollama_running():
         from langchain_ollama import ChatOllama
-        return ChatOllama(model="llama3.2", temperature=temperature)
+        return ChatOllama(model=model or "llama3.2", temperature=temperature)
 
     raise ConnectionError(
         "No active LLM backend found. Configure GROQ_API_KEY in Streamlit Secrets (or enter a Groq API key) "
@@ -92,13 +104,23 @@ def get_llm(api_key: Optional[str] = None, temperature: float = 0):
     )
 
 
-def invoke_llm(prompt: str, api_key: Optional[str] = None, temperature: float = 0) -> str:
+def invoke_llm(
+    prompt: str,
+    api_key: Optional[str] = None,
+    model: Optional[str] = None,
+    provider: str = "auto",
+    temperature: float = 0
+) -> str:
     """Invokes the active LLM and returns a plain string response."""
-    model = get_llm(api_key=api_key, temperature=temperature)
+    llm = get_llm(
+        api_key=api_key,
+        model=model,
+        provider=provider,
+        temperature=temperature
+    )
     try:
-        response = model.invoke(prompt)
+        response = llm.invoke(prompt)
     except Exception as err:
-        # Fallback if selected Groq model is unavailable on this key tier
         err_text = str(err).lower()
         key = (api_key or "").strip() or get_groq_api_key()
         if key and ("model_not_found" in err_text or "not found" in err_text or "404" in err_text):

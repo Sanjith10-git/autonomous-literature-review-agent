@@ -7,7 +7,10 @@ def report_agent(
     rag_information: str,
     web_information: str,
     verification: str,
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
+    model: Optional[str] = None,
+    provider: str = "auto",
+    temperature: float = 0
 ) -> str:
     """Compiles a structured academic literature review report from all agent outputs."""
     prompt = f"""
@@ -56,4 +59,10 @@ Rules:
 - Include relevant source URLs from the web research.
 - Write in a professional academic style.
 """
-    return invoke_llm(prompt, api_key=api_key)
+    return invoke_llm(
+        prompt,
+        api_key=api_key,
+        model=model,
+        provider=provider,
+        temperature=temperature
+    )

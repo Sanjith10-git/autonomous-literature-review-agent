@@ -3,11 +3,18 @@ from config.llm import invoke_llm
 from tools.web_search import web_search
 
 
-def web_agent(topic: str, api_key: Optional[str] = None) -> str:
+def web_agent(
+    topic: str,
+    api_key: Optional[str] = None,
+    model: Optional[str] = None,
+    provider: str = "auto",
+    temperature: float = 0,
+    max_results: int = 5
+) -> str:
     """Searches the web for the research topic and summarizes key sourced findings."""
     results = web_search(
         topic,
-        max_results=5
+        max_results=max_results
     )
 
     if not results:
@@ -41,4 +48,10 @@ Rules:
 - Use only the provided search results.
 - Include relevant source URLs.
 """
-    return invoke_llm(prompt, api_key=api_key)
+    return invoke_llm(
+        prompt,
+        api_key=api_key,
+        model=model,
+        provider=provider,
+        temperature=temperature
+    )

@@ -21,7 +21,7 @@ def get_vectorstore() -> Optional[Chroma]:
     return _VECTORSTORE
 
 
-def ingest_pdfs(pdf_paths: Optional[List[str]] = None):
+def ingest_pdfs(pdf_paths: Optional[List[str]] = None, provider: str = "auto"):
     """Ingests PDFs into an isolated in-memory Chroma collection."""
     global _VECTORSTORE
 
@@ -53,7 +53,7 @@ def ingest_pdfs(pdf_paths: Optional[List[str]] = None):
     print(f"Pages loaded: {len(documents)}")
     print(f"Chunks created: {len(chunks)}")
 
-    embeddings = get_embeddings()
+    embeddings = get_embeddings(provider=provider)
     collection_name = f"research_documents_{uuid.uuid4().hex[:8]}"
 
     _VECTORSTORE = Chroma(

@@ -6,7 +6,10 @@ def verification_agent(
     topic: str,
     rag_information: str,
     web_information: str,
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
+    model: Optional[str] = None,
+    provider: str = "auto",
+    temperature: float = 0
 ) -> str:
     """Cross-checks uploaded document insights against web findings."""
     prompt = f"""
@@ -37,4 +40,10 @@ Rules:
 - Do not invent statistics.
 - Clearly identify uncertainty.
 """
-    return invoke_llm(prompt, api_key=api_key)
+    return invoke_llm(
+        prompt,
+        api_key=api_key,
+        model=model,
+        provider=provider,
+        temperature=temperature
+    )

@@ -15,15 +15,36 @@ class ResearchState(TypedDict):
     verification: str
     report: str
     api_key: NotRequired[Optional[str]]
+    provider: NotRequired[str]
+    model: NotRequired[Optional[str]]
+    temperature: NotRequired[float]
+    max_results: NotRequired[int]
+    include_web: NotRequired[bool]
 
 
 def run_rag(state: ResearchState):
-    result = rag_agent(state["topic"], api_key=state.get("api_key"))
+    result = rag_agent(
+        state["topic"],
+        api_key=state.get("api_key"),
+        model=state.get("model"),
+        provider=state.get("provider", "auto"),
+        temperature=state.get("temperature", 0.0)
+    )
     return {"rag_result": result}
 
 
 def run_web(state: ResearchState):
-    result = web_agent(state["topic"], api_key=state.get("api_key"))
+    if not state.get("include_web", True):
+        return {"web_result": "Web search skipped per configuration."}
+
+    result = web_agent(
+        state["topic"],
+        api_key=state.get("api_key"),
+        model=state.get("model"),
+        provider=state.get("provider", "auto"),
+        temperature=state.get("temperature", 0.0),
+        max_results=state.get("max_results", 5)
+    )
     return {"web_result": result}
 
 
@@ -32,7 +53,10 @@ def run_verification(state: ResearchState):
         state["topic"],
         state["rag_result"],
         state["web_result"],
-        api_key=state.get("api_key")
+        api_key=state.get("api_key"),
+        model=state.get("model"),
+        provider=state.get("provider", "auto"),
+        temperature=state.get("temperature", 0.0)
     )
     return {"verification": result}
 
@@ -43,7 +67,10 @@ def run_report(state: ResearchState):
         state["rag_result"],
         state["web_result"],
         state["verification"],
-        api_key=state.get("api_key")
+        api_key=state.get("api_key"),
+        model=state.get("model"),
+        provider=state.get("provider", "auto"),
+        temperature=state.get("temperature", 0.0)
     )
     return {"report": result}
 

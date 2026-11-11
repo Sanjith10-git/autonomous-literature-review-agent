@@ -3,7 +3,13 @@ from config.llm import invoke_llm
 from rag.ingest import get_vectorstore
 
 
-def rag_agent(question: str, api_key: Optional[str] = None) -> str:
+def rag_agent(
+    question: str,
+    api_key: Optional[str] = None,
+    model: Optional[str] = None,
+    provider: str = "auto",
+    temperature: float = 0
+) -> str:
     """Retrieves relevant chunks from ingested PDFs and answers using the active LLM."""
     vectorstore = get_vectorstore()
     if vectorstore is None:
@@ -35,4 +41,10 @@ Instructions:
 - Do not invent facts.
 - If the information is unavailable, say so.
 """
-    return invoke_llm(prompt, api_key=api_key)
+    return invoke_llm(
+        prompt,
+        api_key=api_key,
+        model=model,
+        provider=provider,
+        temperature=temperature
+    )
