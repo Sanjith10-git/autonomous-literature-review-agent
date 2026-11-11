@@ -96,12 +96,12 @@ st.markdown("""
         width: 34px;
         height: 34px;
         border-radius: 9px;
-        background: #1E3A8A;
+        background: linear-gradient(180deg, #B91C1C 0%, #7F1D1D 100%);
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        box-shadow: 0 2px 8px rgba(30, 58, 138, 0.24);
+        box-shadow: 0 2px 8px rgba(153, 27, 27, 0.28);
     }
     .sidebar-brand-title {
         font-size: 0.96rem;
@@ -146,40 +146,40 @@ st.markdown("""
     }
     [data-testid="stPopover"] > button:hover {
         opacity: 1;
-        border-color: #1D4ED8 !important;
-        color: #1D4ED8 !important;
+        border-color: #B91C1C !important;
+        color: #B91C1C !important;
     }
 
-    /* Refined Editorial Header Card */
+    /* Professional Editorial Header Card */
     .hero-card {
         display: flex;
         align-items: center;
-        gap: 1.05rem;
-        padding: 1.25rem 1.55rem;
+        gap: 1.15rem;
+        padding: 1.35rem 1.7rem;
         margin-bottom: 1.35rem;
         border-radius: 14px;
-        background: linear-gradient(125deg, rgba(30, 58, 138, 0.085) 0%, rgba(30, 58, 138, 0.025) 60%, rgba(14, 165, 233, 0.06) 100%);
-        border: 1px solid rgba(30, 58, 138, 0.18);
-        border-left: 4px solid #1E3A8A;
-        box-shadow: 0 8px 24px -10px rgba(30, 58, 138, 0.14);
+        background: linear-gradient(135deg, rgba(153, 27, 27, 0.08) 0%, rgba(185, 28, 28, 0.025) 55%, rgba(220, 38, 38, 0.05) 100%);
+        border: 1px solid rgba(153, 27, 27, 0.2);
+        border-left: 5px solid #991B1B;
+        box-shadow: 0 10px 28px -12px rgba(127, 29, 29, 0.18);
     }
     .hero-icon {
-        width: 44px;
-        height: 44px;
+        width: 46px;
+        height: 46px;
         border-radius: 11px;
-        background: linear-gradient(180deg, #1E40AF 0%, #1E3A8A 100%);
+        background: linear-gradient(180deg, #B91C1C 0%, #7F1D1D 100%);
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.28);
+        box-shadow: 0 4px 14px rgba(153, 27, 27, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.22);
     }
     .hero-title {
         font-family: 'Newsreader', Georgia, serif;
-        font-size: 1.95rem;
+        font-size: 2.05rem;
         font-weight: 700;
-        letter-spacing: -0.02em;
-        line-height: 1.18;
+        letter-spacing: -0.025em;
+        line-height: 1.15;
         margin: 0;
     }
 
@@ -198,8 +198,8 @@ st.markdown("""
         font-size: 0.95rem !important;
     }
     [data-testid="stTextInput"] input:focus {
-        border-color: #1D4ED8 !important;
-        box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.14) !important;
+        border-color: #B91C1C !important;
+        box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.14) !important;
     }
     [data-testid="stFileUploaderDropzone"] {
         border-radius: 10px !important;
@@ -207,8 +207,8 @@ st.markdown("""
         transition: border-color 0.2s ease, background-color 0.2s ease;
     }
     [data-testid="stFileUploaderDropzone"]:hover {
-        border-color: #1D4ED8 !important;
-        background-color: rgba(29, 78, 216, 0.025) !important;
+        border-color: #B91C1C !important;
+        background-color: rgba(185, 28, 28, 0.025) !important;
     }
 
     /* Staged manuscript badges */
@@ -237,21 +237,21 @@ st.markdown("""
 
     /* Primary & secondary buttons */
     button[kind="primary"] {
-        background: linear-gradient(180deg, #1E40AF 0%, #1E3A8A 100%) !important;
-        border-color: #1E3A8A !important;
+        background: linear-gradient(180deg, #B91C1C 0%, #991B1B 100%) !important;
+        border-color: #7F1D1D !important;
         color: #FFFFFF !important;
         border-radius: 9px !important;
         font-weight: 600 !important;
         font-size: 0.95rem !important;
         padding: 0.62rem 1.25rem !important;
-        box-shadow: 0 3px 10px rgba(30, 58, 138, 0.22) !important;
+        box-shadow: 0 3px 10px rgba(153, 27, 27, 0.24) !important;
         transition: all 0.18s ease !important;
     }
     button[kind="primary"]:hover {
-        background: linear-gradient(180deg, #2563EB 0%, #1D4ED8 100%) !important;
-        border-color: #1D4ED8 !important;
+        background: linear-gradient(180deg, #DC2626 0%, #B91C1C 100%) !important;
+        border-color: #991B1B !important;
         transform: translateY(-1px) !important;
-        box-shadow: 0 6px 16px rgba(29, 78, 216, 0.3) !important;
+        box-shadow: 0 6px 16px rgba(185, 28, 28, 0.32) !important;
     }
     button[kind="secondary"] {
         border-radius: 8px !important;
@@ -259,8 +259,8 @@ st.markdown("""
         border-color: rgba(148, 163, 184, 0.35) !important;
     }
     button[kind="secondary"]:hover {
-        border-color: #1D4ED8 !important;
-        color: #1D4ED8 !important;
+        border-color: #B91C1C !important;
+        color: #B91C1C !important;
     }
 
     /* Segmented Pill Tab Styling */
@@ -278,8 +278,8 @@ st.markdown("""
         font-weight: 500 !important;
     }
     button[data-baseweb="tab"][aria-selected="true"] {
-        background: rgba(30, 58, 138, 0.12) !important;
-        color: #1D4ED8 !important;
+        background: rgba(153, 27, 27, 0.12) !important;
+        color: #B91C1C !important;
         font-weight: 600 !important;
     }
     [data-baseweb="tab-highlight"] {
@@ -320,15 +320,15 @@ st.markdown("""
         padding-top: 0.35rem;
     }
     .report-body blockquote {
-        border-left: 3px solid #1D4ED8;
+        border-left: 3px solid #B91C1C;
         padding-left: 1rem;
         opacity: 0.88;
     }
     .qa-answer {
         padding: 0.9rem 1.1rem;
         border-radius: 10px;
-        background: rgba(30, 58, 138, 0.05);
-        border: 1px solid rgba(30, 58, 138, 0.16);
+        background: rgba(153, 27, 27, 0.05);
+        border: 1px solid rgba(153, 27, 27, 0.18);
         margin-top: 0.5rem;
         line-height: 1.65;
     }
@@ -376,7 +376,7 @@ def create_pdf(report: str, topic: str) -> bytes:
         "ReportTitle",
         parent=styles["Title"],
         alignment=TA_CENTER,
-        textColor=colors.HexColor("#1E3A8A"),
+        textColor=colors.HexColor("#991B1B"),
         fontSize=18,
         leading=22,
         spaceAfter=10
