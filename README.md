@@ -1,6 +1,6 @@
 # 🤖 Multi-Agent AI Research Assistant
 
-An intelligent, multi-agent research assistant powered by **LangGraph**, **Ollama**, **ChromaDB**, and **Streamlit**. It automates deep research by combining document-based retrieval (RAG) with real-time web search, cross-source fact verification, and comprehensive report generation.
+An intelligent, multi-agent research assistant powered by **LangGraph**, **Ollama**, **ChromaDB**, and **Streamlit**. It automates deep literature reviews by combining document-based retrieval (RAG) with real-time web search, cross-source fact verification, and comprehensive report generation.
 
 ---
 
@@ -27,7 +27,7 @@ User Query + Uploaded PDFs
     [Document RAG]  <── (ChromaDB + nomic-embed-text)
            │
            ▼
-     [Web Research]  <── (DuckDuckGo Search)
+      [Web Research]  <── (DuckDuckGo Search)
            │
            ▼
   [Fact Verification]  (Cross-checks PDF vs. Web findings)
@@ -36,8 +36,24 @@ User Query + Uploaded PDFs
   [Report Generation]  (Synthesizes comprehensive findings)
            │
            ▼
-   Markdown & PDF Export
+    Markdown & PDF Export
 ```
+
+---
+
+## 📸 Core Implementation Highlights
+
+### 1. LangGraph Multi-Agent State Machine (`workflow.py`)
+![LangGraph State Machine](assets/1_langgraph_workflow.png)
+*Coordinates sequential execution across RAG, Web Search, Verification, and Report Generation agents using a unified `ResearchState` schema.*
+
+### 2. Cross-Source Fact Verification Agent (`agents/verifier.py`)
+![Verification Agent](assets/2_verification_agent.png)
+*Acts as an automated peer reviewer comparing claims between uploaded PDFs and live web search data to detect consensus and flag contradictions.*
+
+### 3. ChromaDB Vector Store & Local RAG (`agents/rag_agent.py`)
+![RAG Agent](assets/3_rag_agent.png)
+*Embeds research documents locally with `nomic-embed-text` and performs dense semantic retrieval to supply grounded evidence.*
 
 ---
 
@@ -57,8 +73,8 @@ User Query + Uploaded PDFs
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/<YOUR_USERNAME>/<YOUR_REPOSITORY_NAME>.git
-cd MultiAgentResearchAssistant
+git clone https://github.com/Sanjith10-git/autonomous-literature-review-agent.git
+cd autonomous-literature-review-agent
 ```
 
 ### 2. Create and Activate a Virtual Environment
@@ -99,6 +115,7 @@ MultiAgentResearchAssistant/
 │   └── ingest.py             # PDF chunking and vectorstore ingestion
 ├── tools/
 │   └── web_search.py         # DuckDuckGo search integration
+├── assets/                   # Architecture and code highlight images
 ├── data/                     # Uploaded PDF documents
 ├── outputs/                  # Generated reports (Markdown & PDF)
 ├── app.py                    # Streamlit web application
