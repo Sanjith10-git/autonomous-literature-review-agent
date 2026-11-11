@@ -834,15 +834,33 @@ if run_clicked:
         except Exception as error:
 
             err_msg = str(error)
-            if "no active llm backend" in err_msg.lower() or "ollama" in err_msg.lower() or "connection" in err_msg.lower():
+            err_lower = err_msg.lower()
+
+            if "groq_api_key" in err_lower or "authentication" in err_lower or "api key" in err_lower or "401" in err_lower:
                 st.error(
-                    "Unable to reach the inference service. Locally, ensure Ollama is running (`ollama serve`). "
-                    "On Streamlit Cloud, ensure `GROQ_API_KEY` is configured in App Secrets."
+                    "**Groq API key error.** Please verify your `GROQ_API_KEY` is correct in "
+                    "Streamlit Cloud → App Settings → Secrets."
+                )
+            elif "no active llm backend" in err_lower or "no active" in err_lower:
+                st.error(
+                    "**No inference backend available.** "
+                    "On Streamlit Cloud: add `GROQ_API_KEY` to App Settings → Secrets. "
+                    "Locally: run `ollama serve` with `llama3.2` and `nomic-embed-text` available."
+                )
+            elif "model_not_found" in err_lower or "not found" in err_lower or "404" in err_lower:
+                st.error(
+                    "**LLM model not found.** The configured Groq model is unavailable on your plan. "
+                    "Please check your Groq console for supported models."
+                )
+            elif "rate_limit" in err_lower or "rate limit" in err_lower or "429" in err_lower:
+                st.error(
+                    "**Rate limit reached.** Your Groq API quota has been exceeded. "
+                    "Wait a moment and try again, or check your usage at console.groq.com."
                 )
             else:
-                st.error("The research workflow failed during execution.")
+                st.error(f"**Research workflow error:** {err_msg[:300]}")
 
-            with st.expander("Technical error details"):
+            with st.expander("Technical error details", expanded=False):
                 st.code(err_msg)
 
 

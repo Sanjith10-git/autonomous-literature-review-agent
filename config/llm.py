@@ -45,16 +45,23 @@ def get_groq_api_key() -> str:
 
 def get_embeddings(provider: str = "auto") -> Embeddings:
     """
-    Returns Ollama embeddings when local Ollama is selected/running;
-    otherwise uses Chroma's zero-dependency in-memory ONNX embeddings.
+    Returns Ollama embeddings only when explicitly requested AND Ollama is running.
+    Falls back to Chroma's zero-dependency in-memory ONNX embeddings in all other cases.
     """
-    if provider != "groq" and is_ollama_running():
+    # Only try Ollama embeddings when explicitly selected or auto-detected locally
+    # AND no Groq key is available (meaning we're definitely in a local environment)
+    if provider == "ollama" or (
+        provider == "auto"
+        and not get_groq_api_key()   # no cloud key → local-only environment
+        and is_ollama_running()
+    ):
         try:
             from langchain_ollama import OllamaEmbeddings
             return OllamaEmbeddings(model="nomic-embed-text")
         except Exception:
             pass
 
+    # Always safe fallback: in-process ONNX embeddings, no network required
     return ChromaDefaultEmbeddings()
 
 
@@ -65,18 +72,25 @@ def get_llm(
     temperature: float = 0
 ):
     """
-    Resolves and returns the active ChatModel for local Ollama or Groq Cloud.
+    Resolves and returns the active ChatModel.
+
+    Priority order (auto mode):
+      1. Groq Cloud — if GROQ_API_KEY is available (env var or Streamlit secrets)
+      2. Local Ollama — if reachable and no cloud key is configured
+      3. Raise ConnectionError with actionable guidance
     """
     explicit_key = (api_key or "").strip()
     selected_provider = (provider or "auto").lower()
 
-    if selected_provider == "ollama" or (
-        selected_provider == "auto" and not explicit_key and is_ollama_running()
-    ):
+    # Explicit Ollama selection (never used on Streamlit Cloud)
+    if selected_provider == "ollama":
         from langchain_ollama import ChatOllama
         return ChatOllama(model=model or "llama3.2", temperature=temperature)
 
+    # Resolve cloud key (secrets.toml / env var / explicit argument)
     key = explicit_key or get_groq_api_key()
+
+    # --- Groq Cloud (preferred when key is available) ---
     if key and selected_provider in ("auto", "groq"):
         from langchain_groq import ChatGroq
         candidates = [model] if model else []
@@ -94,13 +108,15 @@ def get_llm(
             except Exception:
                 continue
 
-    if selected_provider == "auto" and is_ollama_running():
+    # --- Local Ollama fallback (auto mode, no cloud key) ---
+    if selected_provider == "auto" and not key and is_ollama_running():
         from langchain_ollama import ChatOllama
         return ChatOllama(model=model or "llama3.2", temperature=temperature)
 
     raise ConnectionError(
-        "No active LLM backend found. Configure GROQ_API_KEY in Streamlit Secrets (or enter a Groq API key) "
-        "for cloud execution, or start Ollama locally with `llama3.2`."
+        "No active LLM backend found. "
+        "On Streamlit Cloud: add GROQ_API_KEY to App Settings → Secrets. "
+        "Locally: start Ollama with `ollama serve` (llama3.2 + nomic-embed-text)."
     )
 
 
